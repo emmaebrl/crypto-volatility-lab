@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "crypto-volatility-lab"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+bs4 = "^0.0.2"
+pandas = "^2.2.3"
+numpy = "^2.2.0"
+yfinance = "^0.2.51"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
