@@ -4,6 +4,8 @@ version = "0.1.0"
 description = ""
 authors = ["Your Name <you@example.com>"]
 readme = "README.md"
+packages = [{ include = "crypto_volatility_lab" }]
+
 
 [tool.poetry.dependencies]
 python = "^3.11"
@@ -11,7 +13,11 @@ bs4 = "^0.0.2"
 pandas = "^2.2.3"
 numpy = "^2.2.0"
 yfinance = "^0.2.51"
+matplotlib = "^3.10.0"
 
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core"]

@@ -48,7 +48,7 @@ class CryptoScraper:
             f"period1={start_unix}&period2={end_unix}"
         )
 
-    def get_data_for_currency(self, currency):
+    def get_data_for_currency(self, currency) -> pd.DataFrame:
         url = self._build_url(currency)
         response = None
         try:
@@ -61,6 +61,7 @@ class CryptoScraper:
                 return pd.DataFrame()
 
             data_headers = [th.text for th in table.find("thead").find_all("th")]  # type: ignore
+            data_headers = [header.split()[0].strip() for header in data_headers]
             rows = table.find("tbody").find_all("tr")  # type: ignore
             data = []
             for row in rows:
@@ -71,7 +72,7 @@ class CryptoScraper:
             print(
                 f"Error fetching data from {url}: {e} (Status code: {response.status_code if response else 'N/A'})"
             )
-            return None
+            return pd.DataFrame()
 
     def get_data(
         self,
