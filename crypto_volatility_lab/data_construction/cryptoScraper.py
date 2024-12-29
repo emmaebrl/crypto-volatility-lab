@@ -17,7 +17,9 @@ class CryptoScraper:
     def __init__(
         self,
         start_date: Optional[str] = None,
-        end_date: str = datetime.datetime.now().strftime("%Y-%m-%d"),
+        end_date: str = (datetime.datetime.now() + datetime.timedelta(days=1)).strftime(
+            "%Y-%m-%d"
+        ),
         headers=DEFAULT_HEADERS,
     ):
         self.start_date = self._parse_date(start_date) if start_date else None
