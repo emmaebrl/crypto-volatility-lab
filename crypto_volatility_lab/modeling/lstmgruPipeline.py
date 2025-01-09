@@ -1,67 +1,111 @@
+from typing import Tuple
 import numpy as np
-from tensorflow.keras.models import Sequential # type: ignore
-from tensorflow.keras.layers import LSTM, GRU, Dense, Reshape # type: ignore
+from tensorflow.keras.models import Sequential  # type: ignore
+from tensorflow.keras.layers import LSTM, GRU, Dense, Dropout, Input  # type: ignore
+from tensorflow.keras.optimizers import Adam  # type: ignore
 from sklearn.preprocessing import MinMaxScaler
-from joblib import Parallel, delayed
-from tqdm import tqdm
+
 
 class LSTMGRUPipeline:
-    def __init__(self, window_size=25, forecast_horizon=5, in_sample_size=100, 
-                 out_sample_size=5, lstm_units=50, gru_units=50, n_jobs=1, epochs=1, batch_size=32):
-        self.window_size = window_size
+    def __init__(
+        self,
+        lookback: int = 25,
+        forecast_horizon: int = 5,
+        lstm_unit: int = 48,
+        gru_unit: int = 16,
+        dropout_rate: float = 0.1,
+        learning_rate: float = 0.01,
+        epochs: int = 1,
+        batch_size: int = 32,
+        validation_split: float = 0.2,
+        scale_data: bool = False,
+    ):
+        self.lookback = lookback
         self.forecast_horizon = forecast_horizon
-        self.in_sample_size = in_sample_size
-        self.out_sample_size = out_sample_size
-        self.lstm_units = lstm_units
-        self.gru_units = gru_units
-        self.n_jobs = n_jobs
+        self.lstm_unit = lstm_unit
+        self.gru_unit = gru_unit
+        self.dropout_rate = dropout_rate
+        self.learning_rate = learning_rate
         self.epochs = epochs
         self.batch_size = batch_size
-        self.scaler = MinMaxScaler()
+        self.validation_split = validation_split
+        self.scale_data = scale_data
+        self.scaler = MinMaxScaler() if scale_data else None
+        self.history = None
+        self.model = None
 
-    def create_lagged_features(self, data):
-        X, y = [], []
-        for t in range(self.window_size, len(data) - self.forecast_horizon):
-            X.append(data[t - self.window_size:t])
-            y.append(data[t:t + self.forecast_horizon])
-        return np.array(X), np.array(y)
+    def create_lagged_features(self, data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        X = np.array(
+            [
+                data[t - self.lookback : t]
+                for t in range(self.lookback, len(data) - self.forecast_horizon + 1)
+            ]
+        )
+        y = np.array(
+            [
+                data[t : t + self.forecast_horizon]
+                for t in range(self.lookback, len(data) - self.forecast_horizon + 1)
+            ]
+        )
+        return X, y
 
-    def rolling_window_indices(self, data_length):
-        indices = []
-        for start in range(data_length - self.in_sample_size - self.out_sample_size):
-            train_start, train_end = start, start + self.in_sample_size
-            test_start, test_end = train_end, train_end + self.out_sample_size
-            indices.append((train_start, train_end, test_start, test_end))
-        return indices
+    def scale_features(self, X: np.ndarray) -> np.ndarray:
+        if self.scaler:
+            n_samples, n_timesteps, n_features = X.shape
+            X = self.scaler.fit_transform(X.reshape(-1, n_features)).reshape(X.shape)
+        return X
 
-    def create_mixed_model(self, input_shape, forecast_horizon, num_features):
-        model = Sequential([
-            LSTM(self.lstm_units, activation='relu', return_sequences=True, input_shape=input_shape),
-            GRU(self.gru_units, activation='relu'),
-            Dense(forecast_horizon * num_features),
-            Reshape((forecast_horizon, num_features))
-        ])
-        model.compile(optimizer='adam', loss='mse')
+    def create_mixed_model(self, input_shape: Tuple[int, ...]) -> Sequential:
+        model = Sequential(
+            [
+                Input(shape=input_shape),
+                LSTM(
+                    self.lstm_unit,
+                    activation="relu",
+                    return_sequences=True,
+                ),
+                Dropout(self.dropout_rate),
+                GRU(self.gru_unit, activation="relu"),
+                Dropout(self.dropout_rate),
+                Dense(1),
+            ]
+        )
+        optimizer = Adam(learning_rate=self.learning_rate)
+        model.compile(optimizer=optimizer, loss="mse")
         return model
 
-    def process_window(self, data_scaled, X, y, indices):
-        train_start, train_end, test_start, test_end = indices
-        X_train, y_train = X[train_start:train_end], y[train_start:train_end]
-        X_test, y_test = X[test_start:test_end], y[test_start:test_end]
+    def run(self, data: np.ndarray) -> Sequential:
+        X, y = self.create_lagged_features(data)
 
-        model = self.create_mixed_model(X_train.shape[1:], self.forecast_horizon, data_scaled.shape[1])
-        model.fit(X_train, y_train, epochs=self.epochs, batch_size=self.batch_size, verbose=0)
-        test_loss = model.evaluate(X_test, y_test, verbose=0)
+        if self.scale_data:
+            X = self.scale_features(X)
 
-        return train_start, test_start, test_loss
+        self.model = self.create_mixed_model(X.shape[1:])
 
-    def run(self, data):
-        data_scaled = self.scaler.fit_transform(data)
-        X, y = self.create_lagged_features(data_scaled)
-        indices_list = self.rolling_window_indices(len(X))
-
-        results = Parallel(n_jobs=self.n_jobs)(
-            delayed(self.process_window)(data_scaled, X, y, indices) for indices in tqdm(indices_list, desc="Training progress")
+        self.history = self.model.fit(
+            X,
+            y,
+            epochs=self.epochs,
+            batch_size=self.batch_size,
+            validation_split=self.validation_split,
+            verbose=1,
         )
 
-        return results
+        return self.model
+
+    def get_history(self):
+        if self.history:
+            return self.history.history
+        return None
+
+    def predict(self, new_data: np.ndarray) -> np.ndarray:
+        X_new, _ = self.create_lagged_features(new_data)
+        if self.scale_data and self.scaler:
+            X_new = self.scaler.transform(X_new.reshape(-1, X_new.shape[2])).reshape(
+                X_new.shape
+            )
+        if self.model is None:
+            raise ValueError("Model has not been trained yet")
+
+        else:
+            return self.model.predict(X_new)

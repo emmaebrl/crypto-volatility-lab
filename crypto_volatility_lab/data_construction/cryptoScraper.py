@@ -80,14 +80,21 @@ class CryptoScraper:
         self,
         currencies: List[str],
         output_folder: Optional[str] = "data",
-    ):
-        output_folder = output_folder or "data"
-        os.makedirs(output_folder, exist_ok=True)
+    ) -> pd.DataFrame:
+        all_data = pd.DataFrame()
         for currency in currencies:
             df = self.get_data_for_currency(currency)
             if isinstance(df, pd.DataFrame) and not df.empty:
-                output_path = os.path.join(output_folder, f"{currency}.csv")
-                df.to_csv(output_path, index=False)
-                print(f"Data for {currency} saved to {output_path}.")
+                df['Currency'] = currency
+                all_data = pd.concat([all_data, df], ignore_index=True)
             else:
                 print(f"No data found for {currency}.")
+        
+        if not all_data.empty:
+            output_folder = output_folder or "data"
+            os.makedirs(output_folder, exist_ok=True)
+            output_path = os.path.join(output_folder, "all_currencies_data.csv")
+            all_data.to_csv(output_path, index=False)
+            print(f"All data saved to {output_path}.")
+        
+        return all_data
