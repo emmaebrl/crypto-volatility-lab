@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 from tensorflow.keras.models import Sequential  # type: ignore
 from tensorflow.keras.layers import LSTM, Dense, Dropout, Input  # type: ignore
 from tensorflow.keras.optimizers import Adam  # type: ignore
@@ -17,7 +18,6 @@ class LSTMPipeline:
         epochs: int = 1,
         batch_size: int = 32,
         validation_split: float = 0.2,
-        scale_data: bool = False,
     ):
         self.lookback = lookback
         self.forecast_horizon = forecast_horizon
@@ -27,31 +27,28 @@ class LSTMPipeline:
         self.epochs = epochs
         self.batch_size = batch_size
         self.validation_split = validation_split
-        self.scale_data = scale_data
-        self.scaler = MinMaxScaler() if scale_data else None
         self.history = None
         self.model = None
 
-    def create_lagged_features(self, data: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def create_lagged_features(
+        self, X: np.ndarray, y: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+
+        assert X.shape[0] == y.shape[0]
         X = np.array(
             [
-                data[t - self.lookback : t]
-                for t in range(self.lookback, len(data) - self.forecast_horizon + 1)
+                X[t - self.lookback : t]
+                for t in range(self.lookback, len(X) - self.forecast_horizon + 1)
             ]
         )
         y = np.array(
             [
-                data[t : t + self.forecast_horizon]
-                for t in range(self.lookback, len(data) - self.forecast_horizon + 1)
+                y[t : t + self.forecast_horizon]
+                for t in range(self.lookback, len(y) - self.forecast_horizon + 1)
             ]
         )
-        return X, y
 
-    def scale_features(self, X: np.ndarray) -> np.ndarray:
-        if self.scaler:
-            n_samples, n_features = X.shape[:2]
-            X = self.scaler.fit_transform(X.reshape(-1, n_features)).reshape(X.shape)
-        return X
+        return X, y
 
     def create_lstm_model(self, input_shape: Tuple[int, ...]) -> Sequential:
         model = Sequential(
@@ -72,15 +69,10 @@ class LSTMPipeline:
         model.compile(optimizer=optimizer, loss="mse")
         return model
 
-    def run(self, data: np.ndarray) -> Sequential:
-        X, y = self.create_lagged_features(data)
-
-        if self.scale_data:
-            X = self.scale_features(X)
-
+    def fit(self, X: np.ndarray, y: np.ndarray) -> Sequential:
+        X, y = self.create_lagged_features(X, y)
         self.model = self.create_lstm_model(X.shape[1:])
 
-        # Entraînement du modèle
         self.history = self.model.fit(
             X,
             y,
@@ -89,7 +81,13 @@ class LSTMPipeline:
             validation_split=self.validation_split,
             verbose=1,
         )
-
+        if self.history is not None:
+            print(f"Train Loss (MSE from history): {self.history.history['loss'][-1]}")
+            print(
+                f"Validation Loss (MSE from history): {self.history.history['val_loss'][-1]}"
+            )
+        else:
+            print("No training history available.")
         return self.model
 
     def get_history(self):
@@ -97,15 +95,27 @@ class LSTMPipeline:
             return self.history.history
         return None
 
-    def predict(self, new_data: np.ndarray) -> np.ndarray:
-        X_new, _ = self.create_lagged_features(new_data)
-        if self.scale_data and self.scaler:
-            X_new = self.scaler.transform(X_new.reshape(-1, X_new.shape[2])).reshape(
-                X_new.shape
-            )
+    def evaluate_metrics(self, X: np.ndarray, y: np.ndarray):
+        X, y = self.create_lagged_features(X, y)
+        if self.model is None:
+            raise ValueError("Model has not been trained yet")
+
+        else:
+            predictions = self.model.predict(X, verbose=0)
+
+            mse = mean_squared_error(y.flatten(), predictions.flatten())
+            mae = mean_absolute_error(y.flatten(), predictions.flatten())
+            mape = np.mean(np.abs((y - predictions) / y)) * 100
+
+            print(f"Mean Squared Error (MSE): {mse:.4f}")
+            print(f"Mean Absolute Error (MAE): {mae:.4f}")
+            print(f"Mean Absolute Percentage Error (MAPE): {mape:.4f}%")
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        X, _ = self.create_lagged_features(X, np.zeros_like(X))
 
         if self.model is None:
             raise ValueError("Model has not been trained yet")
 
         else:
-            return self.model.predict(X_new)
+            return self.model.predict(X)
