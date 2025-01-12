@@ -18,6 +18,7 @@ class LSTMPipeline:
         epochs: int = 1,
         batch_size: int = 32,
         validation_split: float = 0.2,
+        normalization: bool = True,
     ):
         self.lookback = lookback
         self.forecast_horizon = forecast_horizon
@@ -27,6 +28,7 @@ class LSTMPipeline:
         self.epochs = epochs
         self.batch_size = batch_size
         self.validation_split = validation_split
+        self.normalization = normalization
         self.history = None
         self.model = None
 
@@ -50,6 +52,15 @@ class LSTMPipeline:
 
         return X, y
 
+    def normalize_data(
+        self, X: np.ndarray, y: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        if self.normalization:
+            scaler = MinMaxScaler()
+            X = scaler.fit_transform(X.reshape(-1, X.shape[-1])).reshape(X.shape)
+            y = scaler.fit_transform(y.reshape(-1, y.shape[-1])).reshape(y.shape)
+        return X, y
+
     def create_lstm_model(self, input_shape: Tuple[int, ...]) -> Sequential:
         model = Sequential(
             [
@@ -70,6 +81,7 @@ class LSTMPipeline:
         return model
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> Sequential:
+        X, y = self.normalize_data(X, y)
         X, y = self.create_lagged_features(X, y)
         self.model = self.create_lstm_model(X.shape[1:])
 
@@ -96,6 +108,7 @@ class LSTMPipeline:
         return None
 
     def evaluate_metrics(self, X: np.ndarray, y: np.ndarray):
+        X, y = self.normalize_data(X, y)
         X, y = self.create_lagged_features(X, y)
         if self.model is None:
             raise ValueError("Model has not been trained yet")
@@ -112,6 +125,7 @@ class LSTMPipeline:
             print(f"Mean Absolute Percentage Error (MAPE): {mape:.4f}%")
 
     def predict(self, X: np.ndarray) -> np.ndarray:
+        X, _ = self.normalize_data(X, np.zeros_like(X))
         X, _ = self.create_lagged_features(X, np.zeros_like(X))
 
         if self.model is None:

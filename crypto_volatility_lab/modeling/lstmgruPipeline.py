@@ -19,6 +19,7 @@ class LSTMGRUPipeline:
         epochs: int = 1,
         batch_size: int = 32,
         validation_split: float = 0.2,
+        normalize: bool = False,
     ):
         self.lookback = lookback
         self.forecast_horizon = forecast_horizon
@@ -29,14 +30,25 @@ class LSTMGRUPipeline:
         self.epochs = epochs
         self.batch_size = batch_size
         self.validation_split = validation_split
+        self.normalize = normalize
+
         self.history = None
         self.model = None
+        self.scaler_X = MinMaxScaler() if normalize else None
+        self.scaler_y = MinMaxScaler() if normalize else None
 
     def create_lagged_features(
         self, X: np.ndarray, y: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
 
         assert X.shape[0] == y.shape[0]
+
+        if self.normalize:
+            if self.scaler_X is not None:
+                X = self.scaler_X.fit_transform(X)
+            if self.scaler_y is not None:
+                y = self.scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
+
         X = np.array(
             [
                 X[t - self.lookback : t]
@@ -105,6 +117,10 @@ class LSTMGRUPipeline:
         else:
             predictions = self.model.predict(X, verbose=0)
 
+            if self.normalize and self.scaler_y is not None:
+                predictions = self.scaler_y.inverse_transform(predictions)
+                y = self.scaler_y.inverse_transform(y)
+
             mse = mean_squared_error(y.flatten(), predictions.flatten())
             mae = mean_absolute_error(y.flatten(), predictions.flatten())
             mape = np.mean(np.abs((y - predictions) / y)) * 100
@@ -120,4 +136,9 @@ class LSTMGRUPipeline:
             raise ValueError("Model has not been trained yet")
 
         else:
-            return self.model.predict(X)
+            predictions = self.model.predict(X)
+            if self.normalize and self.scaler_y is not None:
+                predictions = self.scaler_y.inverse_transform(predictions)
+                print("Predictions have been inverse transformed")
+
+        return predictions
