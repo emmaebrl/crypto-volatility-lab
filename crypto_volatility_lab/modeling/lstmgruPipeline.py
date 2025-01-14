@@ -139,6 +139,5 @@ class LSTMGRUPipeline:
             predictions = self.model.predict(X)
             if self.normalize and self.scaler_y is not None:
                 predictions = self.scaler_y.inverse_transform(predictions)
-                print("Predictions have been inverse transformed")
 
         return predictions
