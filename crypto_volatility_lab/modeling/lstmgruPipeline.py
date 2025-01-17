@@ -6,6 +6,10 @@ from tensorflow.keras.layers import LSTM, GRU, Dense, Dropout, Input  # type: ig
 from tensorflow.keras.optimizers import Adam  # type: ignore
 from sklearn.preprocessing import MinMaxScaler
 import tensorflow as tf
+import random
+import os
+
+os.environ["TF_DETERMINISTIC_OPS"] = "1"
 
 
 class LSTMGRUPipeline:
@@ -35,8 +39,8 @@ class LSTMGRUPipeline:
         self.normalize = normalize
         self.random_seed = random_seed
 
-        # Set random seed for reproducibility
         np.random.seed(self.random_seed)
+        random.seed(self.random_seed)
         tf.random.set_seed(self.random_seed)
 
         self.history = None

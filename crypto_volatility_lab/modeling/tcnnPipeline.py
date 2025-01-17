@@ -1,22 +1,24 @@
+from typing import Tuple
 import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from tensorflow.keras.models import Sequential  # type: ignore
-from tensorflow.keras.layers import LSTM, Dense, Dropout, Input  # type: ignore
+from tensorflow.keras.layers import Conv1D, Dense, Dropout, Input, Flatten  # type: ignore
 from tensorflow.keras.optimizers import Adam  # type: ignore
 from sklearn.preprocessing import MinMaxScaler
-from typing import Tuple
 import tensorflow as tf
+import random
 import os
 
-os.environ["TF_DETERMINISTIC_OPS"] = "1" 
+os.environ["TF_DETERMINISTIC_OPS"] = "1"
 
 
-class LSTMPipeline:
+class TCNNPipeline:
     def __init__(
         self,
         lookback: int = 25,
         forecast_horizon: int = 5,
-        lstm_units: Tuple[int, int] = (48, 16),
+        num_filters: int = 64,
+        kernel_size: int = 3,
         dropout_rate: float = 0.1,
         learning_rate: float = 0.01,
         epochs: int = 1,
@@ -27,7 +29,8 @@ class LSTMPipeline:
     ):
         self.lookback = lookback
         self.forecast_horizon = forecast_horizon
-        self.lstm_units = lstm_units
+        self.num_filters = num_filters
+        self.kernel_size = kernel_size
         self.dropout_rate = dropout_rate
         self.learning_rate = learning_rate
         self.epochs = epochs
@@ -36,8 +39,8 @@ class LSTMPipeline:
         self.normalize = normalize
         self.random_seed = random_seed
 
-        # Set random seed for reproducibility
         np.random.seed(self.random_seed)
+        random.seed(self.random_seed)
         tf.random.set_seed(self.random_seed)
 
         self.history = None
@@ -50,6 +53,7 @@ class LSTMPipeline:
     ) -> Tuple[np.ndarray, np.ndarray]:
 
         assert X.shape[0] == y.shape[0]
+
         X = np.array(
             [
                 X[t - self.lookback : t]
@@ -65,18 +69,25 @@ class LSTMPipeline:
 
         return X, y
 
-    def create_lstm_model(self, input_shape: Tuple[int, ...]) -> Sequential:
+    def create_tcnn_model(self, input_shape: Tuple[int, ...]) -> Sequential:
         model = Sequential(
             [
                 Input(shape=input_shape),
-                LSTM(
-                    self.lstm_units[0],
+                Conv1D(
+                    filters=self.num_filters,
+                    kernel_size=self.kernel_size,
                     activation="relu",
-                    return_sequences=True,
+                    padding="same",
                 ),
                 Dropout(self.dropout_rate),
-                LSTM(self.lstm_units[1], activation="relu"),
+                Conv1D(
+                    filters=self.num_filters,
+                    kernel_size=self.kernel_size,
+                    activation="relu",
+                    padding="same",
+                ),
                 Dropout(self.dropout_rate),
+                Flatten(),
                 Dense(self.forecast_horizon),
             ]
         )
@@ -95,7 +106,7 @@ class LSTMPipeline:
             y = self.scaler_y.fit_transform(y.reshape(-1, 1)).flatten()
 
         X, y = self.create_lagged_features(X, y)
-        self.model = self.create_lstm_model(X.shape[1:])
+        self.model = self.create_tcnn_model(X.shape[1:])
 
         self.history = self.model.fit(
             X,

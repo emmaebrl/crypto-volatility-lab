@@ -6,6 +6,9 @@ from tensorflow.keras.models import Sequential  # type: ignore
 from tensorflow.keras.layers import GRU, Dense, Dropout, Input  # type: ignore
 from tensorflow.keras.optimizers import Adam  # type: ignore
 import tensorflow as tf
+import os
+
+os.environ["TF_DETERMINISTIC_OPS"] = "1"
 
 
 class GRUPipeline:
