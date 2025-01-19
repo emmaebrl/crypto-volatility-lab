@@ -1,23 +1,20 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crypto Volatility Lab - MoSEF</title>
-    <!-- 📌 Ajout de Bootstrap -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;700&display=swap" rel="stylesheet">
     <style>
-       
         body {
-            background-color: #0a1931; 
+            background-color: #0a1931;
             color: white;
             font-family: 'Raleway', sans-serif;
         }
 
-        
         .header {
-            background: linear-gradient(135deg, #0a1931, #f4c20d); 
+            background: linear-gradient(135deg, #0a1931, #f4c20d);
             color: white;
             padding: 20px 0;
             text-align: center;
@@ -28,23 +25,20 @@
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
         }
 
-      
         .header span {
             color: #f4c20d;
             text-shadow: 0 0 10px #f4c20d, 0 0 20px #f4c20d, 0 0 30px #f4c20d;
         }
 
-       
         .container {
             margin-top: 40px;
             text-align: center;
         }
 
-      
         .card {
             padding: 30px;
             border-radius: 15px;
-            background: rgba(255, 255, 255, 0.15); 
+            background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(12px);
             box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.3);
             transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
@@ -55,7 +49,6 @@
             box-shadow: 0px 15px 25px rgba(255, 255, 255, 0.3);
         }
 
-       
         .card h3 {
             color: #ffffff;
             font-weight: bold;
@@ -66,7 +59,6 @@
             font-size: 18px;
         }
 
-        
         .btn {
             margin-top: 15px;
             padding: 12px 20px;
@@ -77,12 +69,12 @@
         }
 
         .btn-success {
-            background-color: #1f8d4b; 
+            background-color: #1f8d4b;
             border: none;
         }
 
         .btn-primary {
-            background-color: #f4c20d; 
+            background-color: #f4c20d;
             color: #0a1931;
             border: none;
         }
@@ -97,7 +89,6 @@
             transform: scale(1.1);
         }
 
-        
         .footer {
             margin-top: 50px;
             background: rgba(255, 255, 255, 0.15);
@@ -112,34 +103,30 @@
 </head>
 <body>
 
-
 <div class="header">
     🚀 Crypto Volatility Lab - <span>MASTER 2 MOSEF</span>
 </div>
 
-
 <div class="container">
-    <h1 class="mb-4">Bienvenue sur l'API Crypto Volatility Lab</h1>
+    <h1 class="mb-4">Welcome to the Crypto Volatility Lab API</h1>
 
     <div class="row">
         <div class="col-md-6 offset-md-3">
             <div class="card">
-                <h3>📈 Tester les Endpoints</h3>
-                <p>Cliquez sur les liens pour interagir avec l'API :</p>
+                <h3>📈 Test the Endpoints</h3>
+                <p>Click the links below to interact with the API:</p>
 
-                <a href="/health" class="btn btn-success">✅ Vérifier la santé du serveur</a>
-                <a href="/scrape?crypto=BTC-USD" class="btn btn-primary">📊 Scraper les données du Bitcoin</a>
-                <a href="/docs" class="btn btn-dark">📜 Voir la documentation interactive</a>
+                <a href="/health" class="btn btn-success">✅ Check Server Health</a>
+                <a href="/scrape?crypto=BTC-USD" class="btn btn-primary">📊 Scrape Bitcoin Data</a>
+                <a href="/docs" class="btn btn-dark">📜 View Interactive Documentation</a>
             </div>
         </div>
     </div>
 </div>
 
-
 <div class="footer">
     <p>by Emma Eberle, Sharon Chemmama, Lina Benzemma</p>
 </div>
-
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
