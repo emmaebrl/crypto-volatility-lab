@@ -153,3 +153,4 @@ class GRUPipeline:
                 predictions = self.scaler_y.inverse_transform(predictions)
 
         return predictions
+
