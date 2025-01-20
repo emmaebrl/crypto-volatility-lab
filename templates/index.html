@@ -5,14 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crypto Volatility Lab - MoSEF</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;700&display=swap" rel="stylesheet">
     <style>
         body {
             background-color: #0a1931;
             color: white;
             font-family: 'Raleway', sans-serif;
         }
-
         .header {
             background: linear-gradient(135deg, #0a1931, #f4c20d);
             color: white;
@@ -24,17 +22,14 @@
             text-transform: uppercase;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
         }
-
         .header span {
             color: #f4c20d;
             text-shadow: 0 0 10px #f4c20d, 0 0 20px #f4c20d, 0 0 30px #f4c20d;
         }
-
         .container {
             margin-top: 40px;
             text-align: center;
         }
-
         .card {
             padding: 30px;
             border-radius: 15px;
@@ -43,22 +38,18 @@
             box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.3);
             transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
         }
-
         .card:hover {
             transform: translateY(-5px);
             box-shadow: 0px 15px 25px rgba(255, 255, 255, 0.3);
         }
-
         .card h3 {
             color: #ffffff;
             font-weight: bold;
         }
-
         .card p {
             color: #e0e0e0;
             font-size: 18px;
         }
-
         .btn {
             margin-top: 15px;
             padding: 12px 20px;
@@ -67,28 +58,28 @@
             font-weight: bold;
             transition: 0.3s ease-in-out;
         }
-
         .btn-success {
             background-color: #1f8d4b;
             border: none;
         }
-
         .btn-primary {
             background-color: #f4c20d;
             color: #0a1931;
             border: none;
         }
-
+        .btn-info {
+            background-color: #17a2b8;
+            color: white;
+            border: none;
+        }
         .btn-dark {
             background-color: #444;
             color: white;
             border: none;
         }
-
         .btn:hover {
             transform: scale(1.1);
         }
-
         .footer {
             margin-top: 50px;
             background: rgba(255, 255, 255, 0.15);
@@ -117,7 +108,9 @@
                 <p>Click the links below to interact with the API:</p>
 
                 <a href="/health" class="btn btn-success">✅ Check Server Health</a>
-                <a href="/scrape?crypto=BTC-USD" class="btn btn-primary">📊 Scrape Bitcoin Data</a>
+                <a href="/scrape?crypto=BTC-USD" class="btn btn-primary">📰 Scrape Bitcoin Data</a>
+                <a href="/compute_features?crypto=BTC-USD" class="btn btn-info">🔍 Compute Features</a>
+                <a href="/create_time_series?crypto=BTC-USD" class="btn btn-warning">📈 Create Time Series</a>
                 <a href="/docs" class="btn btn-dark">📜 View Interactive Documentation</a>
             </div>
         </div>
