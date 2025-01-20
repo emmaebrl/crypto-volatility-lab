@@ -39,7 +39,9 @@ class TimeSeriesCreator:
        # )
 
         # Sort the data by ascending date
-        data.sort_values(by=self.date_column_name, inplace=True)
+        #data.sort_values(by=self.date_column_name, inplace=True)
+        data.sort_values(by=self.date_column_name, ascending=False, inplace=True)
+
         return data
 
     def create_log_return_time_series(self):
