@@ -7,6 +7,10 @@ import pandas as pd
 from crypto_volatility_lab.data_construction.cryptoScraper import CryptoScraper
 from crypto_volatility_lab.data_construction.featuresCreator import FeaturesCreator
 from crypto_volatility_lab.data_construction.timeSeriesCreator import TimeSeriesCreator
+import matplotlib.pyplot as plt
+import io
+from fastapi.responses import Response
+
 
 
 cached_data = None
@@ -91,10 +95,16 @@ def compute_features_html(
 
         
         features["Date"] = pd.to_datetime(features["Date"])
-        features = features.sort_values(by="Date", ascending=False).reset_index(drop=True)
+        #features = features.sort_values(by="Date", ascending=False).reset_index(drop=True)
 
         print("📌 Features Data After Processing:")
         print(features.head())
+        print("📌 Colonnes disponibles après feature engineering:")
+        print(features.columns)
+
+        cached_data = features.copy()
+
+
 
         return templates.TemplateResponse(
             "features.html",
@@ -103,6 +113,42 @@ def compute_features_html(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/plot_features")
+def plot_features(feature: str):
+    """Génère un graphique en fonction du type de feature demandé."""
+    global cached_data
+    if cached_data is None:
+        raise HTTPException(status_code=400, detail="Aucune donnée disponible. Exécutez `/compute_features` d'abord.")
+
+    df = cached_data.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.sort_values(by="Date", ascending=True)
+
+    # 📌 Vérifier quelles colonnes sont disponibles
+    print("📌 Colonnes disponibles dans df avant le tracé des graphes:", df.columns)
+
+    plt.figure(figsize=(10, 5))
+
+    if feature == "volatility":
+        if "volatility_weekly_smoothed" in df.columns and "volatility_monthly_smoothed" in df.columns:
+            plt.plot(df["Date"], df["volatility_weekly_smoothed"], label="Weekly Volatility", color='blue')
+            plt.plot(df["Date"], df["volatility_monthly_smoothed"], label="Monthly Volatility", color='red')
+        else:
+            raise HTTPException(status_code=500, detail="Les colonnes de volatilité ne sont pas disponibles.")
+
+
+    plt.xlabel("Date")
+    plt.ylabel(feature.capitalize())
+    plt.title(f"{feature.capitalize()} Graph")
+    plt.legend()
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    return Response(content=buf.getvalue(), media_type="image/png")
+
 
 @app.get("/create_time_series", response_class=HTMLResponse)
 def create_time_series_html(

@@ -15,7 +15,7 @@
             margin-top: 40px;
             text-align: center;
         }
-        .table-container {
+        .table-container, .graph-container {
             margin-top: 20px;
             padding: 20px;
             border-radius: 10px;
@@ -33,6 +33,14 @@
         }
         .table tbody tr:hover {
             background-color: rgba(255, 255, 255, 0.2);
+        }
+        .btn-toggle {
+            margin: 10px;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
         }
         .btn-back {
             margin-top: 20px;
@@ -54,7 +62,11 @@
 <div class="container">
     <h2>📊 Computed Features for {{ crypto }}</h2>
 
-    <div class="table-container">
+    <button class="btn btn-primary btn-toggle" onclick="showTable()">📋 Show Table</button>
+    <button class="btn btn-info btn-toggle" onclick="showGraphs()">📈 Show Graphs</button>
+
+    <!-- 📌 Tableau des Features -->
+    <div id="table-container" class="table-container">
         <table class="table table-bordered table-striped">
             <thead>
                 <tr>
@@ -93,8 +105,26 @@
         </table>
     </div>
 
+    <!-- 📌 Graphes dynamiques -->
+    <div id="graph-container" class="graph-container" style="display: none;">
+        <h3>📊 Weekly & Monthly Volatility</h3>
+        <img src="/plot_features?feature=volatility" alt="Volatility Graph" class="img-fluid">
+    
+    </div>
+
     <a href="/" class="btn btn-back">⬅️ Back to Home</a>
 </div>
+
+<script>
+    function showTable() {
+        document.getElementById('table-container').style.display = 'block';
+        document.getElementById('graph-container').style.display = 'none';
+    }
+    function showGraphs() {
+        document.getElementById('table-container').style.display = 'none';
+        document.getElementById('graph-container').style.display = 'block';
+    }
+</script>
 
 </body>
 </html>
