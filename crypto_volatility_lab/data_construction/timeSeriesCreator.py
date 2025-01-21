@@ -25,22 +25,6 @@ class TimeSeriesCreator:
             raise ValueError(
                 f"Value column '{self.value_column_name}' not found in data."
             )
-        data[self.date_column_name] = pd.to_datetime(data[self.date_column_name])
-        
-         # Vérifier si la colonne est de type string avant d'appliquer .str.replace()
-        if data[self.value_column_name].dtype == 'object':
-           data[self.value_column_name] = data[self.value_column_name].str.replace(",", "")
-
-        # Convertir en numérique pour éviter d'autres erreurs
-        data[self.value_column_name] = pd.to_numeric(data[self.value_column_name], errors='coerce')
-
-        #data[self.value_column_name] = pd.to_numeric(
-            #data[self.value_column_name].str.replace(",", "")
-       # )
-
-        # Sort the data by ascending date
-        data.sort_values(by=self.date_column_name, inplace=True)
-        #data.sort_values(by=self.date_column_name, ascending=False, inplace=True)
 
         return data
 
@@ -69,6 +53,3 @@ class TimeSeriesCreator:
                 "Date": self.data[self.date_column_name],
             }
         ).dropna()
-    
-
-    
