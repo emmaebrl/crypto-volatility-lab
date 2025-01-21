@@ -12,7 +12,6 @@ from crypto_volatility_lab.data_construction.cryptoScraper import CryptoScraper
 from crypto_volatility_lab.data_construction.featuresCreator import FeaturesCreator
 from crypto_volatility_lab.data_construction.timeSeriesCreator import TimeSeriesCreator
 
-
 cached_data = {}
 
 app = FastAPI(title="Crypto Volatility Lab API")
@@ -116,6 +115,10 @@ def compute_features_html(request: Request):
     )
 
 
+
+import matplotlib
+matplotlib.use("Agg")  
+
 @app.get("/plot_features")
 def plot_features(crypto: str):
     """Génère un graphique spécifique pour une crypto donnée."""
@@ -148,7 +151,6 @@ def plot_features(crypto: str):
     buf.seek(0)
 
     return Response(content=buf.getvalue(), media_type="image/png")
-
 
 if __name__ == "__main__":
     import uvicorn
