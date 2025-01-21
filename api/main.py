@@ -1,49 +1,47 @@
-from fastapi import FastAPI, Query, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.requests import Request
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")  
+import matplotlib.pyplot as plt
+import io
 from crypto_volatility_lab.data_construction.cryptoScraper import CryptoScraper
 from crypto_volatility_lab.data_construction.featuresCreator import FeaturesCreator
 from crypto_volatility_lab.data_construction.timeSeriesCreator import TimeSeriesCreator
-import matplotlib.pyplot as plt
-import io
-from fastapi.responses import Response
 
 
-
-cached_data = None
+cached_data = {}
 
 app = FastAPI(title="Crypto Volatility Lab API")
 templates = Jinja2Templates(directory="templates")
+
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
+
 @app.get("/scrape", response_class=HTMLResponse)
 def scrape_crypto_html(request: Request):
-    """Scrape les données et affiche les 3 cryptos dans une seule page."""
-    global cached_data  # Utilisation de la variable globale
-
+    global cached_data
     cryptos = ["BTC-USD", "ETH-USD", "LTC-USD"]
-    scraped_data = {}  # Assurez-vous qu'il s'agit d'un dictionnaire
+    scraped_data = {}
 
     try:
         scraper = CryptoScraper()
-
         for crypto in cryptos:
             data = scraper.get_data_for_currency(crypto)
-
             if data is None or data.empty:
-                scraped_data[crypto] = []  # Assurez-vous qu'il y a une entrée, même vide
+                scraped_data[crypto] = []  
             else:
-                # Conversion des colonnes et nettoyage
                 data["Date"] = pd.to_datetime(data["Date"])
                 data = data.sort_values(by="Date", ascending=False).reset_index(drop=True)
 
@@ -52,151 +50,104 @@ def scrape_crypto_html(request: Request):
                     if col in data.columns:
                         data[col] = pd.to_numeric(data[col].astype(str).str.replace(",", ""), errors="coerce")
 
-                scraped_data[crypto] = data.to_dict(orient="records")  # Convertir en liste de dictionnaires
+                scraped_data[crypto] = data.to_dict(orient="records")  
 
-        cached_data = scraped_data  # Mise à jour du cache
+        cached_data = scraped_data  
 
-        return templates.TemplateResponse(
-            "scrape.html",
-            {"request": request, "data": scraped_data},  # Toujours un dictionnaire
-        )
+        return templates.TemplateResponse("scrape.html", {"request": request, "data": scraped_data})
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/create_time_series", response_class=HTMLResponse)
+def create_time_series_html(request: Request, window_size: int = 21):
+    global cached_data
+
+    if not cached_data:
+        raise HTTPException(status_code=400, detail="Aucune donnée disponible. Exécutez `/scrape` d'abord.")
+
+    time_series_data = {}
+
+    for crypto, data in cached_data.items():
+        df = pd.DataFrame(data)
+
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.sort_values(by="Date", ascending=False).reset_index(drop=True)
+
+        df["Log_Returns"] = np.log(df["Close"] / df["Close"].shift(1)).fillna(0)
+
+        time_series_creator = TimeSeriesCreator(df, date_column_name="Date", value_column_name="Close")
+        time_series_data[crypto] = time_series_creator.create_time_series(window_size).dropna().to_dict(orient="records")
+
+    return templates.TemplateResponse(
+        "time_series.html",
+        {"request": request, "window_size": window_size, "data": time_series_data},
+    )
+
+
 @app.get("/compute_features", response_class=HTMLResponse)
-def compute_features_html(
-    request: Request,
-    crypto: str = Query(..., description="Cryptocurrency ticker (ex: BTC-USD)")
-):
-    """Génère les features en utilisant les données scrappées."""
+def compute_features_html(request: Request):
     global cached_data  
 
-    try:
-        if cached_data is None:
-            raise HTTPException(status_code=400, detail="Aucune donnée scrappée disponible. Exécutez `/scrape` d'abord.")
+    if not cached_data:
+        raise HTTPException(status_code=400, detail="Aucune donnée disponible. Exécutez `/scrape` d'abord.")
 
-        df = cached_data.copy() 
+    features_data = {}
 
-        print("📌 Features Using Cached Data:")
-        print(df.head())
+    for crypto, data in cached_data.items():
+        df = pd.DataFrame(data)
 
         if "Close" not in df.columns:
-            raise HTTPException(status_code=400, detail="Les données ne contiennent pas de prix de clôture.")
+            continue  
 
         df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
         df.dropna(subset=["Close"], inplace=True)
 
-        
         features_creator = FeaturesCreator(df, log_returns_column_name="Close", volatility_column_name="Close")
         features_creator.create_all_features()
-        features = features_creator.transformed_data.dropna()
+        features_data[crypto] = features_creator.transformed_data.dropna().to_dict(orient="records")
 
-        
-        features["Date"] = pd.to_datetime(features["Date"])
-        #features = features.sort_values(by="Date", ascending=False).reset_index(drop=True)
+    cached_data.update(features_data)  
 
-        print("📌 Features Data After Processing:")
-        print(features.head())
-        print("📌 Colonnes disponibles après feature engineering:")
-        print(features.columns)
-
-        cached_data = features.copy()
-
-
-
-        return templates.TemplateResponse(
-            "features.html",
-            {"request": request, "crypto": crypto, "features": features.to_dict(orient="records")},
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return templates.TemplateResponse(
+        "features.html",
+        {"request": request, "data": features_data},
+    )
 
 
 @app.get("/plot_features")
-def plot_features(feature: str):
-    """Génère un graphique en fonction du type de feature demandé."""
+def plot_features(crypto: str):
+    """Génère un graphique spécifique pour une crypto donnée."""
     global cached_data
-    if cached_data is None:
-        raise HTTPException(status_code=400, detail="Aucune donnée disponible. Exécutez `/compute_features` d'abord.")
 
-    df = cached_data.copy()
+    if crypto not in cached_data:
+        raise HTTPException(status_code=400, detail=f"Aucune donnée disponible pour {crypto}. Exécutez `/compute_features` d'abord.")
+
+    df = pd.DataFrame(cached_data[crypto])
     df["Date"] = pd.to_datetime(df["Date"])
     df = df.sort_values(by="Date", ascending=True)
 
-    # 📌 Vérifier quelles colonnes sont disponibles
-    print("📌 Colonnes disponibles dans df avant le tracé des graphes:", df.columns)
+    
+    fig, ax = plt.subplots(figsize=(10, 5))
 
-    plt.figure(figsize=(10, 5))
+    if "volatility_weekly_smoothed" in df.columns and "volatility_monthly_smoothed" in df.columns:
+        ax.plot(df["Date"], df["volatility_weekly_smoothed"], label="Weekly Volatility", linestyle='dashed', color='blue')
+        ax.plot(df["Date"], df["volatility_monthly_smoothed"], label="Monthly Volatility", color='red')
 
-    if feature == "volatility":
-        if "volatility_weekly_smoothed" in df.columns and "volatility_monthly_smoothed" in df.columns:
-            plt.plot(df["Date"], df["volatility_weekly_smoothed"], label="Weekly Volatility", color='blue')
-            plt.plot(df["Date"], df["volatility_monthly_smoothed"], label="Monthly Volatility", color='red')
-        else:
-            raise HTTPException(status_code=500, detail="Les colonnes de volatilité ne sont pas disponibles.")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Volatility")
+    ax.set_title(f"Volatility Graph - {crypto}")
+    ax.legend()
+    ax.grid(True)
 
-
-    plt.xlabel("Date")
-    plt.ylabel(feature.capitalize())
-    plt.title(f"{feature.capitalize()} Graph")
-    plt.legend()
-
+    
     buf = io.BytesIO()
     plt.savefig(buf, format="png")
+    plt.close(fig)  
     buf.seek(0)
+
     return Response(content=buf.getvalue(), media_type="image/png")
-
-
-@app.get("/create_time_series", response_class=HTMLResponse)
-def create_time_series_html(
-    request: Request,
-    crypto: str = Query(..., description="Cryptocurrency ticker (ex: BTC-USD)"),
-    window_size: int = Query(21, description="Window size for volatility computation"),
-):
-    """Génère une série temporelle en utilisant les dernières données scrappées."""
-    global cached_data  
-
-    try:
-        if cached_data is None:
-            raise HTTPException(status_code=400, detail="Aucune donnée scrappée disponible. Exécutez `/scrape` d'abord.")
-
-        df = cached_data.copy()  
-
-        print("📌 Time Series Using Cached Data Before Processing:")
-        print(df.head()) 
-
-        
-        df["Date"] = pd.to_datetime(df["Date"])
-        df = df.sort_values(by="Date", ascending=False).reset_index(drop=True)
-
-        print("📌 Time Series After Sorting:")
-        print(df.head())  
-
-        
-        df["Log_Returns"] = np.log(df["Close"] / df["Close"].shift(1)).fillna(0)
-
-        print("📌 Log Returns Computed on Data:")
-        print(df[["Date", "Close", "Log_Returns"]].head())  
-
-        
-        time_series_creator = TimeSeriesCreator(df.copy(), date_column_name="Date", value_column_name="Close")
-        time_series = time_series_creator.create_time_series(window_size)
-
-        print("📌 Final Time Series Sent to Template:")
-        print(time_series.head())  
-
-        return templates.TemplateResponse(
-            "time_series.html",
-            {"request": request, "crypto": crypto, "window_size": window_size, "time_series": time_series.dropna().to_dict(orient="records")},
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 
 
 if __name__ == "__main__":
