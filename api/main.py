@@ -1,3 +1,4 @@
+from typing import Dict
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -12,90 +13,90 @@ import io
 from fastapi.responses import Response
 
 
-
 cached_data = None
 
 app = FastAPI(title="Crypto Volatility Lab API")
 templates = Jinja2Templates(directory="templates")
 
+
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
+
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
+
 @app.get("/scrape", response_class=HTMLResponse)
-def scrape_crypto_html(request: Request):
-    """Scrape les données et affiche les 3 cryptos dans une seule page."""
-    global cached_data  # Utilisation de la variable globale
+def scrape_crypto_html(
+    request: Request,
+):
+    """Scrape les données et les stocke pour les étapes suivantes."""
+    global cached_data
 
-    cryptos = ["BTC-USD", "ETH-USD", "LTC-USD"]
-    scraped_data = {}  # Assurez-vous qu'il s'agit d'un dictionnaire
+    crypto_list = ["BTC-USD", "ETH-USD", "LTC-USD"]
+    scraper = CryptoScraper()
+    all_data = {}
 
-    try:
-        scraper = CryptoScraper()
-
-        for crypto in cryptos:
+    for crypto in crypto_list:
+        try:
             data = scraper.get_data_for_currency(crypto)
+            if data.empty:
+                all_data[crypto] = []
+                raise HTTPException(
+                    status_code=404, detail=f"Aucune donnée trouvée pour {crypto}."
+                )
+            all_data[crypto] = data.to_dict(orient="records")
+        except HTTPException as http_err:
+            all_data[crypto] = {"error": str(http_err.detail)}
+        except Exception as e:
+            all_data[crypto] = {"error": f"Erreur: {str(e)}"}
 
-            if data is None or data.empty:
-                scraped_data[crypto] = []  # Assurez-vous qu'il y a une entrée, même vide
-            else:
-                # Conversion des colonnes et nettoyage
-                data["Date"] = pd.to_datetime(data["Date"])
-                data = data.sort_values(by="Date", ascending=False).reset_index(drop=True)
-
-                numeric_columns = ["Open", "High", "Low", "Close", "Adj", "Volume"]
-                for col in numeric_columns:
-                    if col in data.columns:
-                        data[col] = pd.to_numeric(data[col].astype(str).str.replace(",", ""), errors="coerce")
-
-                scraped_data[crypto] = data.to_dict(orient="records")  # Convertir en liste de dictionnaires
-
-        cached_data = scraped_data  # Mise à jour du cache
-
-        return templates.TemplateResponse(
-            "scrape.html",
-            {"request": request, "data": scraped_data},  # Toujours un dictionnaire
-        )
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return templates.TemplateResponse(
+        "scrape.html",
+        {"request": request, "data": all_data},
+    )
 
 
 @app.get("/compute_features", response_class=HTMLResponse)
 def compute_features_html(
     request: Request,
-    crypto: str = Query(..., description="Cryptocurrency ticker (ex: BTC-USD)")
+    crypto: str = Query(..., description="Cryptocurrency ticker (ex: BTC-USD)"),
 ):
     """Génère les features en utilisant les données scrappées."""
-    global cached_data  
+    global cached_data
 
     try:
         if cached_data is None:
-            raise HTTPException(status_code=400, detail="Aucune donnée scrappée disponible. Exécutez `/scrape` d'abord.")
+            raise HTTPException(
+                status_code=400,
+                detail="Aucune donnée scrappée disponible. Exécutez `/scrape` d'abord.",
+            )
 
-        df = cached_data.copy() 
+        df = cached_data.copy()
 
         print("📌 Features Using Cached Data:")
         print(df.head())
 
         if "Close" not in df.columns:
-            raise HTTPException(status_code=400, detail="Les données ne contiennent pas de prix de clôture.")
+            raise HTTPException(
+                status_code=400,
+                detail="Les données ne contiennent pas de prix de clôture.",
+            )
 
         df["Close"] = pd.to_numeric(df["Close"], errors="coerce")
         df.dropna(subset=["Close"], inplace=True)
 
-        
-        features_creator = FeaturesCreator(df, log_returns_column_name="Close", volatility_column_name="Close")
+        features_creator = FeaturesCreator(
+            df, log_returns_column_name="Close", volatility_column_name="Close"
+        )
         features_creator.create_all_features()
         features = features_creator.transformed_data.dropna()
 
-        
         features["Date"] = pd.to_datetime(features["Date"])
-        #features = features.sort_values(by="Date", ascending=False).reset_index(drop=True)
+        # features = features.sort_values(by="Date", ascending=False).reset_index(drop=True)
 
         print("📌 Features Data After Processing:")
         print(features.head())
@@ -104,11 +105,13 @@ def compute_features_html(
 
         cached_data = features.copy()
 
-
-
         return templates.TemplateResponse(
             "features.html",
-            {"request": request, "crypto": crypto, "features": features.to_dict(orient="records")},
+            {
+                "request": request,
+                "crypto": crypto,
+                "features": features.to_dict(orient="records"),
+            },
         )
 
     except Exception as e:
@@ -120,7 +123,10 @@ def plot_features(feature: str):
     """Génère un graphique en fonction du type de feature demandé."""
     global cached_data
     if cached_data is None:
-        raise HTTPException(status_code=400, detail="Aucune donnée disponible. Exécutez `/compute_features` d'abord.")
+        raise HTTPException(
+            status_code=400,
+            detail="Aucune donnée disponible. Exécutez `/compute_features` d'abord.",
+        )
 
     df = cached_data.copy()
     df["Date"] = pd.to_datetime(df["Date"])
@@ -132,12 +138,27 @@ def plot_features(feature: str):
     plt.figure(figsize=(10, 5))
 
     if feature == "volatility":
-        if "volatility_weekly_smoothed" in df.columns and "volatility_monthly_smoothed" in df.columns:
-            plt.plot(df["Date"], df["volatility_weekly_smoothed"], label="Weekly Volatility", color='blue')
-            plt.plot(df["Date"], df["volatility_monthly_smoothed"], label="Monthly Volatility", color='red')
+        if (
+            "volatility_weekly_smoothed" in df.columns
+            and "volatility_monthly_smoothed" in df.columns
+        ):
+            plt.plot(
+                df["Date"],
+                df["volatility_weekly_smoothed"],
+                label="Weekly Volatility",
+                color="blue",
+            )
+            plt.plot(
+                df["Date"],
+                df["volatility_monthly_smoothed"],
+                label="Monthly Volatility",
+                color="red",
+            )
         else:
-            raise HTTPException(status_code=500, detail="Les colonnes de volatilité ne sont pas disponibles.")
-
+            raise HTTPException(
+                status_code=500,
+                detail="Les colonnes de volatilité ne sont pas disponibles.",
+            )
 
     plt.xlabel("Date")
     plt.ylabel(feature.capitalize())
@@ -157,48 +178,54 @@ def create_time_series_html(
     window_size: int = Query(21, description="Window size for volatility computation"),
 ):
     """Génère une série temporelle en utilisant les dernières données scrappées."""
-    global cached_data  
+    global cached_data
 
     try:
         if cached_data is None:
-            raise HTTPException(status_code=400, detail="Aucune donnée scrappée disponible. Exécutez `/scrape` d'abord.")
+            raise HTTPException(
+                status_code=400,
+                detail="Aucune donnée scrappée disponible. Exécutez `/scrape` d'abord.",
+            )
 
-        df = cached_data.copy()  
+        df = cached_data.copy()
 
         print("📌 Time Series Using Cached Data Before Processing:")
-        print(df.head()) 
+        print(df.head())
 
-        
         df["Date"] = pd.to_datetime(df["Date"])
         df = df.sort_values(by="Date", ascending=False).reset_index(drop=True)
 
         print("📌 Time Series After Sorting:")
-        print(df.head())  
+        print(df.head())
 
-        
         df["Log_Returns"] = np.log(df["Close"] / df["Close"].shift(1)).fillna(0)
 
         print("📌 Log Returns Computed on Data:")
-        print(df[["Date", "Close", "Log_Returns"]].head())  
+        print(df[["Date", "Close", "Log_Returns"]].head())
 
-        
-        time_series_creator = TimeSeriesCreator(df.copy(), date_column_name="Date", value_column_name="Close")
+        time_series_creator = TimeSeriesCreator(
+            df.copy(), date_column_name="Date", value_column_name="Close"
+        )
         time_series = time_series_creator.create_time_series(window_size)
 
         print("📌 Final Time Series Sent to Template:")
-        print(time_series.head())  
+        print(time_series.head())
 
         return templates.TemplateResponse(
             "time_series.html",
-            {"request": request, "crypto": crypto, "window_size": window_size, "time_series": time_series.dropna().to_dict(orient="records")},
+            {
+                "request": request,
+                "crypto": crypto,
+                "window_size": window_size,
+                "time_series": time_series.dropna().to_dict(orient="records"),
+            },
         )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
-
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

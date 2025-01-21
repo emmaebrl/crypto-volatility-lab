@@ -68,33 +68,17 @@ class CryptoScraper:
             data = []
             for row in rows:
                 data.append([td.text for td in row.find_all("td")])
-
-            return pd.DataFrame(data, columns=data_headers)
+            data = pd.DataFrame(data, columns=data_headers)
+            if "Date" in data.columns:
+                data["Date"] = pd.to_datetime(data["Date"])
+            
+            for col in ["Open", "High", "Low", "Close", "Adj", "Volume"]:
+                if col in data.columns:
+                    data[col] = pd.to_numeric(
+                        data[col].astype(str).str.replace(",", ""), errors="coerce")
+            return data
         except requests.exceptions.RequestException as e:
             print(
                 f"Error fetching data from {url}: {e} (Status code: {response.status_code if response else 'N/A'})"
             )
             return pd.DataFrame()
-
-    def get_data(
-        self,
-        currencies: List[str],
-        output_folder: Optional[str] = "data",
-    ) -> pd.DataFrame:
-        all_data = pd.DataFrame()
-        for currency in currencies:
-            df = self.get_data_for_currency(currency)
-            if isinstance(df, pd.DataFrame) and not df.empty:
-                df['Currency'] = currency
-                all_data = pd.concat([all_data, df], ignore_index=True)
-            else:
-                print(f"No data found for {currency}.")
-        
-        if not all_data.empty:
-            output_folder = output_folder or "data"
-            os.makedirs(output_folder, exist_ok=True)
-            output_path = os.path.join(output_folder, "all_currencies_data.csv")
-            all_data.to_csv(output_path, index=False)
-            print(f"All data saved to {output_path}.")
-        
-        return all_data
