@@ -7,6 +7,10 @@ import pandas as pd
 from crypto_volatility_lab.data_construction.cryptoScraper import CryptoScraper
 from crypto_volatility_lab.data_construction.featuresCreator import FeaturesCreator
 from crypto_volatility_lab.data_construction.timeSeriesCreator import TimeSeriesCreator
+import matplotlib.pyplot as plt
+import io
+from fastapi.responses import Response
+
 
 
 cached_data = None
@@ -23,38 +27,38 @@ def health_check():
     return {"status": "ok"}
 
 @app.get("/scrape", response_class=HTMLResponse)
-def scrape_crypto_html(
-    request: Request,
-    crypto: str = Query(..., description="Nom de la crypto (ex: BTC-USD)")
-):
-    """Scrape les données et les stocke pour les étapes suivantes."""
+def scrape_crypto_html(request: Request):
+    """Scrape les données et affiche les 3 cryptos dans une seule page."""
     global cached_data  # Utilisation de la variable globale
+
+    cryptos = ["BTC-USD", "ETH-USD", "LTC-USD"]
+    scraped_data = {}  # Assurez-vous qu'il s'agit d'un dictionnaire
 
     try:
         scraper = CryptoScraper()
-        data = scraper.get_data_for_currency(crypto)
 
-        if data.empty:
-            raise HTTPException(status_code=404, detail=f"Aucune donnée trouvée pour {crypto}")
+        for crypto in cryptos:
+            data = scraper.get_data_for_currency(crypto)
 
-       
-        data["Date"] = pd.to_datetime(data["Date"])
-        data = data.sort_values(by="Date", ascending=False).reset_index(drop=True)
+            if data is None or data.empty:
+                scraped_data[crypto] = []  # Assurez-vous qu'il y a une entrée, même vide
+            else:
+                # Conversion des colonnes et nettoyage
+                data["Date"] = pd.to_datetime(data["Date"])
+                data = data.sort_values(by="Date", ascending=False).reset_index(drop=True)
 
-        
-        numeric_columns = ["Open", "High", "Low", "Close", "Adj", "Volume"]
-        for col in numeric_columns:
-            if col in data.columns:
-                data[col] = pd.to_numeric(data[col].astype(str).str.replace(",", ""), errors="coerce")
+                numeric_columns = ["Open", "High", "Low", "Close", "Adj", "Volume"]
+                for col in numeric_columns:
+                    if col in data.columns:
+                        data[col] = pd.to_numeric(data[col].astype(str).str.replace(",", ""), errors="coerce")
 
-        cached_data = data  
+                scraped_data[crypto] = data.to_dict(orient="records")  # Convertir en liste de dictionnaires
 
-        print("📌 Scraped Data After Sorting:")
-        print(data.head())  
+        cached_data = scraped_data  # Mise à jour du cache
 
         return templates.TemplateResponse(
             "scrape.html",
-            {"request": request, "crypto": crypto, "data": data.to_dict(orient="records")},
+            {"request": request, "data": scraped_data},  # Toujours un dictionnaire
         )
 
     except Exception as e:
@@ -91,10 +95,16 @@ def compute_features_html(
 
         
         features["Date"] = pd.to_datetime(features["Date"])
-        features = features.sort_values(by="Date", ascending=False).reset_index(drop=True)
+        #features = features.sort_values(by="Date", ascending=False).reset_index(drop=True)
 
         print("📌 Features Data After Processing:")
         print(features.head())
+        print("📌 Colonnes disponibles après feature engineering:")
+        print(features.columns)
+
+        cached_data = features.copy()
+
+
 
         return templates.TemplateResponse(
             "features.html",
@@ -103,6 +113,42 @@ def compute_features_html(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/plot_features")
+def plot_features(feature: str):
+    """Génère un graphique en fonction du type de feature demandé."""
+    global cached_data
+    if cached_data is None:
+        raise HTTPException(status_code=400, detail="Aucune donnée disponible. Exécutez `/compute_features` d'abord.")
+
+    df = cached_data.copy()
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.sort_values(by="Date", ascending=True)
+
+    # 📌 Vérifier quelles colonnes sont disponibles
+    print("📌 Colonnes disponibles dans df avant le tracé des graphes:", df.columns)
+
+    plt.figure(figsize=(10, 5))
+
+    if feature == "volatility":
+        if "volatility_weekly_smoothed" in df.columns and "volatility_monthly_smoothed" in df.columns:
+            plt.plot(df["Date"], df["volatility_weekly_smoothed"], label="Weekly Volatility", color='blue')
+            plt.plot(df["Date"], df["volatility_monthly_smoothed"], label="Monthly Volatility", color='red')
+        else:
+            raise HTTPException(status_code=500, detail="Les colonnes de volatilité ne sont pas disponibles.")
+
+
+    plt.xlabel("Date")
+    plt.ylabel(feature.capitalize())
+    plt.title(f"{feature.capitalize()} Graph")
+    plt.legend()
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+    return Response(content=buf.getvalue(), media_type="image/png")
+
 
 @app.get("/create_time_series", response_class=HTMLResponse)
 def create_time_series_html(
