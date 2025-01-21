@@ -22,6 +22,7 @@
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(12px);
             box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.3);
+            display: none; /* Cache les tables par défaut */
         }
         .crypto-title {
             color: #f4c20d;
@@ -39,10 +40,17 @@
         .table tbody tr:hover {
             background-color: rgba(255, 255, 255, 0.2);
         }
-        .back-btn {
-            margin-top: 30px;
+        .btn-group {
+            margin-bottom: 20px;
+        }
+        .btn-custom {
+            background-color: #f4c20d;
+            color: #0a1931;
             font-weight: bold;
-            text-transform: uppercase;
+            border: none;
+        }
+        .btn-custom:hover {
+            background-color: #d4a10d;
         }
     </style>
 </head>
@@ -51,10 +59,17 @@
 <div class="container">
     <h2>📊 Scraped Data for Selected Cryptos</h2>
 
+    
+    <div class="btn-group">
+        {% for crypto_name in data.keys() %}
+        <button class="btn btn-custom" onclick="showCrypto('{{ crypto_name }}')">{{ crypto_name }}</button>
+        {% endfor %}
+    </div>
+
     <div class="row">
         {% for crypto_name, crypto_data in data.items() %}
-        <div class="col-md-4">
-            <div class="crypto-box">
+        <div class="col-md-12">
+            <div class="crypto-box" id="{{ crypto_name }}">
                 <h3 class="crypto-title">{{ crypto_name }}</h3>
 
                 {% if crypto_data %}
@@ -86,6 +101,19 @@
 
     <a href="/" class="btn btn-warning back-btn">⬅️ Back to Home</a>
 </div>
+
+
+<script>
+    function showCrypto(crypto) {
+        
+        document.querySelectorAll('.crypto-box').forEach(box => {
+            box.style.display = 'none';
+        });
+
+        
+        document.getElementById(crypto).style.display = 'block';
+    }
+</script>
 
 </body>
 </html>
