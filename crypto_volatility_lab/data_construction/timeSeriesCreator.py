@@ -39,8 +39,8 @@ class TimeSeriesCreator:
        # )
 
         # Sort the data by ascending date
-        #data.sort_values(by=self.date_column_name, inplace=True)
-        data.sort_values(by=self.date_column_name, ascending=False, inplace=True)
+        data.sort_values(by=self.date_column_name, inplace=True)
+        #data.sort_values(by=self.date_column_name, ascending=False, inplace=True)
 
         return data
 
@@ -69,3 +69,6 @@ class TimeSeriesCreator:
                 "Date": self.data[self.date_column_name],
             }
         ).dropna()
+    
+
+    
