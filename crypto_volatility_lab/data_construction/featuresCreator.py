@@ -42,20 +42,26 @@ class FeaturesCreator:
             window=monthly_window_size, min_periods=1
         ).mean()
 
-    def create_garch_volatility(self):
-        """Estimates parameters of a GARCH(1,1) model and returns the conditional volatility"""
-        log_returns = self.data[self.log_returns_column_name]
-        model = arch_model(log_returns, vol="GARCH", p=1, q=1, rescale=False)
-        res = model.fit(disp="off")
+        # def create_garch_volatility(self):
+        #     """Estimates parameters of a GARCH(1,1) model and returns the conditional volatility"""
+        #     log_returns = self.data[self.log_returns_column_name].dropna()
+        #     am = arch_model(log_returns, vol="GARCH", p=1, q=1, rescale=True)
+        #     res = am.fit(disp="off")
+        #     forecast = res.forecast(
+        #         start=0, horizon=len(log_returns), method="analytic"
+        #     )
+        #     forecast_volatility = forecast.variance.dropna().values.flatten()
 
-        omega = res.params["omega"]
-        alpha = res.params["alpha[1]"]
-        beta = res.params["beta[1]"]
+        # omega = res.params["omega"]
+        # alpha = res.params["alpha[1]"]
+        # beta = res.params["beta[1]"]
 
-        forecast_vol = np.sqrt(
-            omega + alpha * res.resid**2 + beta * res.conditional_volatility**2
-        )
-        self.transformed_data["GARCH Volatility"] = forecast_vol
+        # forecast_vol = np.sqrt(
+        #     omega + alpha * res.resid**2 + beta * res.conditional_volatility**2
+        # )
+        # self.transformed_data["GARCH Volatility"] = forecast_vol
+
+        # self.transformed_data["GARCH Volatility"] = forecast_volatility
 
     def create_log_trading_range(self):
         """
@@ -79,14 +85,14 @@ class FeaturesCreator:
         Creates all features and adds them to the features DataFrame.
         """
         self.create_smoothed_volatility()
-        self.create_garch_volatility()
+        # self.create_garch_volatility()
         self.create_log_trading_range()
         self.create_log_volume_change()
         self.features_names = [
             "Volatility",
             "Weekly Volatility",
             "Monthly Volatility",
-            "GARCH Volatility",
+            # "GARCH Volatility",
             "Log Trading Range",
             "Log Volume Change",
         ]
