@@ -7,8 +7,11 @@ class FeaturesCreator:
     def __init__(
         self,
         data: pd.DataFrame,
-        log_returns_column_name: str,
-        volatility_column_name: str,
+        log_returns_column_name: str = "Log Returns",
+        volatility_column_name: str = "Volatility",
+        high_column_name: str = "High",
+        low_column_name: str = "Low",
+        volume_column_name: str = "Volume",
     ) -> None:
         """
         Initializes the FeaturesCreator object with a time series.
@@ -19,71 +22,29 @@ class FeaturesCreator:
         self.data = data
         self.volatility_column_name = volatility_column_name
         self.log_returns_column_name = log_returns_column_name
+        self.high_column_name = high_column_name
+        self.low_column_name = low_column_name
+        self.volume_column_name = volume_column_name
         self.transformed_data = data.copy()
         self.features_names = []
 
     def create_smoothed_volatility(self):
         """
         Creates and adds smoothed volatility series (weekly and monthly) to the features DataFrame.
-
-        Adds two columns to the self.features DataFrame:
-            - "volatility_weekly_smoothed"
-            - "volatility_monthly_smoothed"
         """
         volatility = self.data[self.volatility_column_name]
-
         weekly_window_size = 7  # Weekly rolling window
         monthly_window_size = 30  # Monthly rolling window
-
-        self.transformed_data["volatility_weekly_smoothed"] = volatility.rolling(
+        self.transformed_data["Weekly Volatility"] = volatility.rolling(
             window=weekly_window_size, min_periods=1
         ).mean()
-        self.transformed_data["volatility_monthly_smoothed"] = volatility.rolling(
+        self.transformed_data["Monthly Volatility"] = volatility.rolling(
             window=monthly_window_size, min_periods=1
         ).mean()
 
-    def create_RSI_feature(self, window_size: int = 14):
-        """
-        Creates and adds the Relative Strength Index (RSI) feature to the features DataFrame.
-        """
-        # Compute the daily returns
-        daily_returns = self.data[self.log_returns_column_name]
-
-        # Compute the difference between the daily returns
-        delta = daily_returns.diff()
-
-        # Get the positive and negative gains
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
-
-        # Compute the average gain and loss
-        avg_gain = gain.rolling(window=window_size).mean()
-        avg_loss = loss.rolling(window=window_size).mean()
-
-        # Compute the Relative Strength
-        RS = avg_gain / avg_loss
-
-        # Compute the Relative Strength Index
-        RSI = 100 - (100 / (1 + RS))
-
-        self.transformed_data["RSI"] = RSI
-
-    def create_all_features(self):
-        """
-        Creates all features and adds them to the features DataFrame.
-        """
-        self.create_smoothed_volatility()
-        self.create_RSI_feature()
-        self.features_names = [
-            "Volatility",
-            "volatility_weekly_smoothed",
-            "volatility_monthly_smoothed",
-            "RSI",
-        ]
-
-    def garch_volatility(self, log_returns: pd.Series):
+    def create_garch_volatility(self):
         """Estimates parameters of a GARCH(1,1) model and returns the conditional volatility"""
-        # Fit the GARCH(1,1) model
+        log_returns = self.data[self.log_returns_column_name]
         model = arch_model(log_returns, vol="GARCH", p=1, q=1, rescale=False)
         res = model.fit(disp="off")
 
@@ -94,4 +55,38 @@ class FeaturesCreator:
         forecast_vol = np.sqrt(
             omega + alpha * res.resid**2 + beta * res.conditional_volatility**2
         )
-        return forecast_vol
+        self.transformed_data["GARCH Volatility"] = forecast_vol
+
+    def create_log_trading_range(self):
+        """
+        Creates and adds log trading range series to the features DataFrame.
+        """
+        high = self.data[self.high_column_name]
+        low = self.data[self.low_column_name]
+        self.transformed_data["Log Trading Range"] = np.log(high) - np.log(low)
+
+    def create_log_volume_change(self):
+        """
+        Creates and adds log volume change series to the features DataFrame.
+        """
+        volume = self.data[self.volume_column_name]
+        self.transformed_data["Log Volume Change"] = np.log(volume) - np.log(
+            volume.shift(1)
+        )
+
+    def create_all_features(self):
+        """
+        Creates all features and adds them to the features DataFrame.
+        """
+        self.create_smoothed_volatility()
+        self.create_garch_volatility()
+        self.create_log_trading_range()
+        self.create_log_volume_change()
+        self.features_names = [
+            "Volatility",
+            "Weekly Volatility",
+            "Monthly Volatility",
+            "GARCH Volatility",
+            "Log Trading Range",
+            "Log Volume Change",
+        ]

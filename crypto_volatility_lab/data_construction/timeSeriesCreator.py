@@ -13,9 +13,9 @@ class TimeSeriesCreator:
     ):
         self.date_column_name = date_column_name
         self.value_column_name = value_column_name
-        self.data = self._format_data(data)
+        self.data = self._check_data(data)
 
-    def _format_data(self, data: pd.DataFrame):
+    def _check_data(self, data: pd.DataFrame):
         """Formats the input data to ensure it contains the necessary columns."""
         if self.date_column_name not in data.columns:
             raise ValueError(
@@ -25,7 +25,8 @@ class TimeSeriesCreator:
             raise ValueError(
                 f"Value column '{self.value_column_name}' not found in data."
             )
-
+        # Sort the data by ascending date
+        data.sort_values(by=self.date_column_name, inplace=True)
         return data
 
     def create_log_return_time_series(self):
@@ -33,7 +34,7 @@ class TimeSeriesCreator:
         log_returns = np.log(
             self.data[self.value_column_name]
             / self.data[self.value_column_name].shift(1)
-        )  # log returns = log(Pt/Pt-1) = log(Pt) - log(Pt-1)
+        )
         return pd.Series(log_returns)
 
     def create_volatility_time_series(self, window_size: int = 21):

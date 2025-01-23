@@ -123,24 +123,51 @@ class LSTMGRUPipeline:
             X = self.scaler_X.transform(X)
             y = self.scaler_y.transform(y.reshape(-1, 1)).flatten()
 
-        X, y = self.create_lagged_features(X, y)
-        if self.model is None:
-            raise ValueError("Model has not been trained yet")
+            X, y = self.create_lagged_features(X, y)
+            if self.model is None:
+                raise ValueError("Model has not been trained yet")
+            else:
+                predictions = self.model.predict(X, verbose=0)
 
-        else:
-            predictions = self.model.predict(X, verbose=0)
+                if self.normalize and self.scaler_y is not None:
+                    predictions = self.scaler_y.inverse_transform(predictions)
+                    y = self.scaler_y.inverse_transform(y.reshape(-1, 1)).flatten()
 
-            if self.normalize and self.scaler_y is not None:
-                predictions = self.scaler_y.inverse_transform(predictions)
-                y = self.scaler_y.inverse_transform(y.reshape(-1, 1)).flatten()
+                forecast_horizon = predictions.shape[1]
+                y = y.reshape(-1, forecast_horizon)
+                mse_by_horizon = []
+                mae_by_horizon = []
+                mape_by_horizon = []
 
-            mse = mean_squared_error(y.flatten(), predictions.flatten())
-            mae = mean_absolute_error(y.flatten(), predictions.flatten())
-            mape = np.mean(np.abs((y - predictions.flatten()) / y)) * 100
+                print("\nEvaluation Metrics by Time Step:")
+                print(f"{'Time Step':<10}{'MSE':<15}{'MAE':<15}{'MAPE (%)':<15}")
+                print("-" * 45)
 
-            print(f"Mean Squared Error (MSE): {mse:.4f}")
-            print(f"Mean Absolute Error (MAE): {mae:.4f}")
-            print(f"Mean Absolute Percentage Error (MAPE): {mape:.4f}%")
+                for t in range(forecast_horizon):
+                    mse = mean_squared_error(y[:, t], predictions[:, t])
+                    mae = mean_absolute_error(y[:, t], predictions[:, t])
+                    mape = (
+                        np.mean(np.abs((y[:, t] - predictions[:, t]) / y[:, t])) * 100
+                    )
+                    mse_by_horizon.append(mse)
+                    mae_by_horizon.append(mae)
+                    mape_by_horizon.append(mape)
+
+                    print(f"{t+1:<10}{mse:<15.4f}{mae:<15.4f}{mape:<15.4f}")
+
+                overall_mse = mean_squared_error(y.flatten(), predictions.flatten())
+                overall_mae = mean_absolute_error(y.flatten(), predictions.flatten())
+                overall_mape = (
+                    np.mean(np.abs((y.flatten() - predictions.flatten()) / y.flatten()))
+                    * 100
+                )
+
+                print("\nOverall Evaluation Metrics:")
+                print("-" * 45)
+                print(f"{'Metric':<20}{'Value':<15}")
+                print(f"{'Overall MSE':<20}{overall_mse:<15.4f}")
+                print(f"{'Overall MAE':<20}{overall_mae:<15.4f}")
+                print(f"{'Overall MAPE (%)':<20}{overall_mape:<15.4f}")
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         if self.normalize and self.scaler_X is not None:
