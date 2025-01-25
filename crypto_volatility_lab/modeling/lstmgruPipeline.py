@@ -29,7 +29,7 @@ class LSTMGRUPipeline(ModelPipelineBase):
         random.seed(self.random_seed)
         tf.random.set_seed(self.random_seed)
 
-    def create_mixed_model(self, input_shape: Tuple[int, ...]) -> Sequential:
+    def create_model(self, input_shape: Tuple[int, ...]) -> Sequential:
         model = Sequential(
             [
                 Input(shape=input_shape),

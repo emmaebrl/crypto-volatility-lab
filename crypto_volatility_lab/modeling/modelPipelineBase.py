@@ -1,8 +1,11 @@
+import os
 from typing import Tuple, Optional
 import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
 from abc import ABC, abstractmethod
+from tensorflow.keras.models import load_model  # type: ignore
+import pickle
 
 
 class ModelPipelineBase(ABC):
@@ -67,6 +70,8 @@ class ModelPipelineBase(ABC):
         X, y = self.create_lagged_features(X, y)
         self.model = self.create_model(X.shape[1:])
 
+        if self.model is None:
+            raise ValueError("Model has not been created")
         self.history = self.model.fit(
             X,
             y,
@@ -153,3 +158,12 @@ class ModelPipelineBase(ABC):
         if self.history:
             return self.history.history
         return None
+
+    def save(self, path: str):
+        """Save the model and scalers to disk."""
+        if self.model is None:
+            raise ValueError("Model has not been trained yet")
+
+        # dump self
+        with open(path, "wb") as f:
+            pickle.dump(self, f)

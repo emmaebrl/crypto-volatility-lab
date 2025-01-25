@@ -1,10 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
-from starlette.requests import Request
 import numpy as np
+from starlette.requests import Request
 import pandas as pd
 import matplotlib
+import pickle
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -16,6 +17,7 @@ from crypto_volatility_lab.data_construction.timeSeriesCreator import TimeSeries
 
 app = FastAPI(title="Crypto Volatility Lab API")
 templates = Jinja2Templates(directory="templates")
+TF_ENABLE_ONEDNN_OPTS = 0
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -84,11 +86,11 @@ def create_time_series_html(request: Request, window_size: int = 21):
         time_series_creator = TimeSeriesCreator(
             df, date_column_name="Date", value_column_name="Close"
         )
-        time_series_data[crypto] = (
-            time_series_creator.create_time_series(window_size)
-            .dropna()
-            .to_dict(orient="records")
+        df["Log Returns"] = time_series_creator.create_log_return_time_series()
+        df["Volatility"] = time_series_creator.create_volatility_time_series(
+            window_size
         )
+        time_series_data[crypto] = df.dropna().to_dict(orient="records")
 
     time_series_cached_data = time_series_data
     return templates.TemplateResponse(
@@ -100,6 +102,7 @@ def create_time_series_html(request: Request, window_size: int = 21):
 @app.get("/compute_features", response_class=HTMLResponse)
 def compute_features_html(request: Request):
     global features_cached_data
+    global features_names
 
     if not time_series_cached_data:
         raise HTTPException(
@@ -122,6 +125,7 @@ def compute_features_html(request: Request):
         )
 
     features_cached_data = features_data
+    features_names = features_creator.features_names
 
     return templates.TemplateResponse(
         "features.html",
@@ -176,6 +180,57 @@ def plot_features(crypto: str):
     buf.seek(0)
 
     return Response(content=buf.getvalue(), media_type="image/png")
+
+
+def predict_for_model(model_path, data):
+    """Predicts the target variable using the given model."""
+    pipeline = pickle.load(open(model_path, "rb"))
+    return pipeline.predict(data)
+
+
+@app.get("/predictions", response_class=HTMLResponse)
+def predictions_page(request: Request):
+    """Render the main prediction page with model type selection."""
+    model_types = ["GRU", "LSTM", "LSTMGRU", "TCNN"]
+    return templates.TemplateResponse(
+        "predictions_menu.html", {"request": request, "model_types": model_types}
+    )
+
+
+@app.get("/predictions/{model_type}", response_class=HTMLResponse)
+def predictions_by_model(model_type: str, request: Request):
+    """Generate predictions for all cryptos using the selected model type."""
+    global predictions_cached_data
+
+    if not features_cached_data:
+        raise HTTPException(
+            status_code=400,
+            detail="Aucune donnée disponible. Exécutez `/compute_features` d'abord.",
+        )
+
+    predict_data = {}
+    for crypto, data in features_cached_data.items():
+        df = pd.DataFrame(data)
+        df = df[df["Date"] < "2024-01-01"]
+        df["Date"] = str(df["Date"])
+        df = df[features_names]
+
+        model_path = f"api/models/{crypto}/{crypto}_{model_type}.pkl"
+        predictions = predict_for_model(model_path, df)
+        if predictions.ndim == 1:
+            predictions = np.expand_dims(predictions, axis=-1)
+        prediction_df = pd.DataFrame(
+            predictions, columns=[f"t+{i+1}" for i in range(predictions.shape[1])]
+        )
+        prediction_df["Date"] = pd.DataFrame(data)["Date"][-len(predictions) :]
+        predict_data[crypto] = prediction_df.to_dict(orient="records")
+
+    predictions_cached_data = predict_data
+
+    return templates.TemplateResponse(
+        "crypto_predictions.html",
+        {"request": request, "model_type": model_type, "data": predict_data},
+    )
 
 
 if __name__ == "__main__":
