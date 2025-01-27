@@ -152,24 +152,6 @@ class ModelPipelineBase(ABC):
         print(f"{'Overall MAE':<20}{overall_mae:<15.4f}")
         print(f"{'Overall MAPE (%)':<20}{overall_mape:<15.4f}")
 
-        # Retourne les métriques globales et par horizon dans un dictionnaire
-        return {
-            "overall": {
-                "mse": overall_mse,
-                "rmse": overall_rmse,
-                "mae": overall_mae,
-                "mape": overall_mape,
-            },
-            "by_horizon": {
-                "mse": mse_by
-                _horizon,
-                "rmse": rmse_by_horizon,
-                "mae": mae_by_horizon,
-                "mape": mape_by_horizon,
-            },
-        }
-
-
     def get_history(self) -> Optional[dict]:
         """Retrieve training history."""
         if self.history:
