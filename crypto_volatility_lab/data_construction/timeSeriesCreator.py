@@ -1,5 +1,3 @@
-from typing import Optional
-from arch import arch_model
 import numpy as np
 import pandas as pd
 
