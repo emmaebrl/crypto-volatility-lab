@@ -12,7 +12,6 @@ click==8.1.8
 colorama==0.4.6
 comm==0.2.2
 contourpy==1.3.1
--e git+https://github.com/emmaebrl/crypto-volatility-lab.git@fa39dcff1bbc61a84b58165c24b7b6f71c65dde4#egg=crypto_volatility_lab  
 cycler==0.12.1
 debugpy==1.8.12
 decorator==5.1.1
