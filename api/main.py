@@ -201,6 +201,7 @@ def predictions_page(request: Request):
 def predictions_by_model(model_type: str, request: Request):
     """Generate predictions for all cryptos using the selected model type."""
     global predictions_cached_data
+    global last_predictions_cached_data
 
     if not features_cached_data:
         raise HTTPException(
@@ -209,6 +210,7 @@ def predictions_by_model(model_type: str, request: Request):
         )
 
     predict_data = {}
+    last_predict_data = {}
     for crypto, data in features_cached_data.items():
         df = pd.DataFrame(data)
         df = df[df["Date"] < "2024-01-01"]
@@ -224,8 +226,10 @@ def predictions_by_model(model_type: str, request: Request):
         )
         prediction_df["Date"] = pd.DataFrame(data)["Date"][-len(predictions) :]
         predict_data[crypto] = prediction_df.to_dict(orient="records")
+        last_predict_data[crypto] = predict_data[crypto][:, 4]
 
     predictions_cached_data = predict_data
+    last_predictions_cached_data = last_predict_data
 
     return templates.TemplateResponse(
         "crypto_predictions.html",

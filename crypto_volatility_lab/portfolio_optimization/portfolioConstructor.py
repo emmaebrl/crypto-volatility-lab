@@ -26,7 +26,6 @@ class PortfolioConstructor:
         ), "The sum of weights for each period should be equal to 1."
         return weights
 
-
     def calculate_target_volatility(self):
         """
         Calculates the target volatility based on the latest volatility prediction.
