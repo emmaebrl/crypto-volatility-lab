@@ -28,13 +28,13 @@ class PortfolioConstructor:
 
     def calculate_target_volatility(self):
         """
-        Calculates the target volatility based on the latest volatility prediction.
-        """
+    Calculates the target volatility based on the latest volatility prediction.
+    """
         latest_volatility_pred = self.volatility_time_series.iloc[-1]
         if self.target_vol_factor:
-            target_volatility = self.target_vol_factor * latest_volatility_pred.mean()
+            target_volatility = self.target_vol_factor * latest_volatility_pred.median()  # 🔥 Changer mean() en median()
         else:
-            target_volatility = latest_volatility_pred.mean()
+            target_volatility = latest_volatility_pred.median()
         return target_volatility
 
     def risk_parity_weights_simple_target(self) -> pd.DataFrame:
@@ -44,7 +44,8 @@ class PortfolioConstructor:
         target_volatility = self.calculate_target_volatility()
         weights = self.risk_parity_weights_simple()
         portfolio_volatility = (weights * self.volatility_time_series).sum(axis=1)
-        adjustment_factor = target_volatility / portfolio_volatility
+        adjustment_factor = (target_volatility / portfolio_volatility).clip(lower=0.5, upper=2.0)
+
         weights_adjusted = weights.mul(adjustment_factor, axis=0)
         weights_adjusted = weights_adjusted.div(weights_adjusted.sum(axis=1), axis=0)
 
