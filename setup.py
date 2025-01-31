@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="crypto-volatility-lab",
+    name="crypto_volatility_lab",
     version="0.1",
     packages=["crypto_volatility_lab"],
     install_requires=[
