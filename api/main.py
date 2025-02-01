@@ -17,8 +17,6 @@ from crypto_volatility_lab.portfolio_optimization.portfolioConstructor import (
 
 matplotlib.use("Agg")
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-
-
 app = FastAPI(title="Crypto Volatility Lab API")
 templates = Jinja2Templates(directory="api/templates")
 TF_ENABLE_ONEDNN_OPTS = 0
@@ -26,16 +24,19 @@ TF_ENABLE_ONEDNN_OPTS = 0
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
+    """Render the main index page."""
     return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/health")
 def health_check():
+    """Health check endpoint."""
     return {"status": "ok"}
 
 
 @app.get("/scrape", response_class=HTMLResponse)
 def scrape_crypto_html(request: Request):
+    """Scrape the latest data for BTC, ETH, and LTC."""
     global scraped_cached_data
     cryptos = ["BTC-USD", "ETH-USD", "LTC-USD"]
     scraped_data = {}
@@ -73,12 +74,13 @@ def scrape_crypto_html(request: Request):
 
 @app.get("/create_time_series", response_class=HTMLResponse)
 def create_time_series_html(request: Request, window_size: int = 21):
+    """Create time series data for all cryptos."""
     global time_series_cached_data
 
     if "scraped_cached_data" not in globals():
         raise HTTPException(
             status_code=400,
-            detail="Aucune donnée disponible. Exécutez /scrape d'abord.",
+            detail="No data available. Run /scrape first.",
         )
 
     else:
@@ -106,13 +108,14 @@ def create_time_series_html(request: Request, window_size: int = 21):
 
 @app.get("/compute_features", response_class=HTMLResponse)
 def compute_features_html(request: Request):
+    """Compute features for all cryptos."""
     global features_cached_data
     global features_names
 
     if "time_series_cached_data" not in globals():
         raise HTTPException(
             status_code=400,
-            detail="Aucune donnée disponible. Exécutez /create_time_series d'abord.",
+            detail="No data available. Run /create_time_series first.",
         )
 
     else:
@@ -161,7 +164,7 @@ def predictions_by_model(model_type: str, request: Request):
     if "features_cached_data" not in globals():
         raise HTTPException(
             status_code=400,
-            detail="Aucune donnée disponible. Exécutez /compute_features d'abord.",
+            detail="No data available. Run /compute_features first.",
         )
 
     else:
@@ -171,8 +174,6 @@ def predictions_by_model(model_type: str, request: Request):
             df["Date"] = pd.to_datetime(df["Date"])
             last_date = df["Date"].max()
 
-            # take last date and 30 days before
-            # df = df[df["Date"] >= last_date - pd.DateOffset(days=32)]
             df = df[features_names]
 
             model_path = os.path.join(
@@ -182,7 +183,7 @@ def predictions_by_model(model_type: str, request: Request):
             if not os.path.exists(model_path):
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Modèle {model_type} introuvable pour {crypto}.",
+                    detail=f"Model not found for {crypto} and {model_type}.",
                 )
             predictions = predict_for_model(model_path, df)
 
@@ -211,13 +212,14 @@ def predictions_by_model(model_type: str, request: Request):
 
 @app.get("/risk_parity", response_class=HTMLResponse)
 def risk_parity_page(request: Request):
+    """Render the main risk parity optimization page."""
 
     global predictions_cached_data
 
     if "predictions_cached_data" not in globals():
         raise HTTPException(
             status_code=400,
-            detail="Aucune prédiction disponible. Exécutez /predictions/LSTM d'abord.",
+            detail="No data available. Run /predictions first.",
         )
 
     else:
@@ -249,11 +251,10 @@ def risk_parity_page(request: Request):
         if not all_days_weights:
             raise HTTPException(
                 status_code=400,
-                detail="Aucune prédiction valide pour les jours t+1 à t+5.",
+                detail="No data available for risk parity optimization.",
             )
 
-        print("\n✅ Poids optimisés pour t+1 à t+5:", all_days_weights)
-
+        print("\n✅ All Days Weights:\n", all_days_weights)
         return templates.TemplateResponse(
             "risk_parity.html",
             {
