@@ -1,7 +1,6 @@
 from typing import Optional
 import numpy as np
 import pandas as pd
-from scipy.optimize import minimize
 
 
 class PortfolioConstructor:
@@ -10,80 +9,66 @@ class PortfolioConstructor:
         volatility_time_series: pd.DataFrame,
         target_vol_factor: Optional[float] = 1.0,
     ):
-        """Initializes the PortfolioConstructor object with a time series of asset volatilities."""
+        """Initialise le PortfolioConstructor avec une série temporelle de volatilités."""
         self.volatility_time_series = volatility_time_series
-        self.target_vol_factor = target_vol_factor
+
+        # ✅ Vérification et conversion
+        if target_vol_factor is None:
+            raise ValueError("❌ ERREUR: `target_vol_factor` ne peut pas être None !")
+        self.target_vol_factor = float(target_vol_factor)
+
+        # ✅ Calcul automatique de target_volatility avec la NOUVELLE APPROCHE
+        self.target_volatility = self.calculate_target_volatility()
 
     def risk_parity_weights_simple(self) -> pd.DataFrame:
         """
-        Calculates the simple Risk Parity weights based on the inverse of asset volatilities.
+        Calcule les poids de Risk Parity basés sur l'inverse des volatilités.
         """
-        inverse_volatility = 1 / self.volatility_time_series
+        inverse_volatility = 1 / (self.volatility_time_series + 1e-8)  # ✅ Évite la division par zéro
         weights = inverse_volatility.div(inverse_volatility.sum(axis=1), axis=0)
 
         assert np.allclose(
             weights.sum(axis=1), 1
-        ), "The sum of weights for each period should be equal to 1."
+        ), "❌ ERREUR: La somme des poids doit être égale à 1."
         return weights
 
-    def calculate_target_volatility(self):
+    def calculate_target_volatility(self) -> float:
         """
-    Calculates the target volatility based on the latest volatility prediction.
-    """
-        latest_volatility_pred = self.volatility_time_series.iloc[-1]
-        if self.target_vol_factor:
-            target_volatility = self.target_vol_factor * latest_volatility_pred.median()  # 🔥 Changer mean() en median()
-        else:
-            target_volatility = latest_volatility_pred.median()
-        return target_volatility
+        Calcule une volatilité cible dynamique basée sur les prédictions LSTM.
+        """
+        vol_series = self.volatility_time_series.mean(axis=1)  # Moyenne des volatilités sur le temps
+
+        # ✅ Nouvelle méthode : Accélération de la volatilité avec `diff().diff()`
+        vol_acceleration = vol_series.diff().diff().fillna(0)  
+
+        # ✅ Transformation exponentielle pour amplifier les différences
+        dynamic_factor = np.exp(np.clip(vol_acceleration.iloc[-1], -0.2, 0.2))  
+
+        # ✅ Calcul d’une volatilité cible amplifiée
+        base_vol = vol_series.iloc[-1]  
+        target_volatility = self.target_vol_factor * base_vol * dynamic_factor
+
+        return float(target_volatility)
 
     def risk_parity_weights_simple_target(self) -> pd.DataFrame:
         """
-        Calculates the Risk Parity weights based on the inverse of asset volatilities.
+        Calcule les poids de Risk Parity ajustés pour une volatilité cible dynamique.
         """
-        target_volatility = self.calculate_target_volatility()
+        target_volatility = self.target_volatility
         weights = self.risk_parity_weights_simple()
         portfolio_volatility = (weights * self.volatility_time_series).sum(axis=1)
-        adjustment_factor = (target_volatility / portfolio_volatility).clip(lower=0.5, upper=2.0)
 
+        # ✅ Éviter la division par zéro
+        portfolio_volatility = portfolio_volatility.replace(0, np.nan).fillna(1e-8)
+
+        # ✅ Transformation exponentielle pour rendre l’effet plus visible
+        adjustment_factor = np.exp((target_volatility / portfolio_volatility) - 1)  
+
+        # ✅ Nouvelle plage pour maximiser l'effet
+        adjustment_factor = adjustment_factor.clip(lower=0.7, upper=1.5)  
+
+        # ✅ Application de l'ajustement aux poids
         weights_adjusted = weights.mul(adjustment_factor, axis=0)
         weights_adjusted = weights_adjusted.div(weights_adjusted.sum(axis=1), axis=0)
 
         return weights_adjusted
-
-    # def _risk_budget_objective(
-    #     self, weights: np.ndarray, cov_matrix: np.ndarray
-    # ) -> float:
-    #     """Objective function to minimize for the risk budget optimization."""
-    #     weights = np.array(weights).reshape(-1, 1)
-    #     portfolio_volatility = np.sqrt(weights.T @ cov_matrix @ weights).flatten()[0]
-    #     marginal_risk_contribution = (
-    #         cov_matrix @ weights
-    #     ).flatten() / portfolio_volatility
-    #     risk_contributions = weights.flatten() * marginal_risk_contribution
-    #     return float(np.std(risk_contributions))
-
-    # def risk_parity_weights(self) -> pd.DataFrame:
-    #     # compute cov_matrix for each time step
-    #     cov_matrix = self.volatility_time_series.cov().values
-    #     num_assets = cov_matrix.shape[0]
-    #     constraints = {"type": "eq", "fun": lambda w: np.sum(w) - 1}
-    #     bounds = [(0, 1) for _ in range(num_assets)]
-    #     initial_guess = np.ones(num_assets) / num_assets
-
-    #     result = minimize(
-    #         self._risk_budget_objective,
-    #         initial_guess,
-    #         method="SLSQP",
-    #         bounds=bounds,
-    #         constraints=constraints,
-    #         options={"disp": False},
-    #     )
-
-    #     if not result.success:
-    #         raise RuntimeError("L'optimisation Risk Parity n'a pas convergé.")
-    #     weights_optimized = pd.DataFrame(
-    #         [result.x], columns=self.volatility_time_series.columns
-    #     )
-
-    #     return weights_optimized
