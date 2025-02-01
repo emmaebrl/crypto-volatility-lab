@@ -61,7 +61,7 @@ class ModelPipelineBase(ABC):
         """Abstract method for creating the machine learning model."""
         pass
 
-    def fit(self, X: np.ndarray, y: np.ndarray):
+    def fit(self, X: np.ndarray, y: np.ndarray, verbose: int = 0):
         """Fit the model to the data."""
         if self.normalize and self.scaler_X is not None and self.scaler_y is not None:
             X = self.scaler_X.fit_transform(X)
@@ -78,10 +78,10 @@ class ModelPipelineBase(ABC):
             epochs=self.epochs,
             batch_size=self.batch_size,
             validation_split=self.validation_split,
-            verbose=1,
+            verbose=verbose,
         )
 
-    def predict(self, X: np.ndarray) -> np.ndarray:
+    def predict(self, X: np.ndarray, verbose: int = 0) -> np.ndarray:
         """Generate predictions."""
         if self.normalize and self.scaler_X is not None:
             X = self.scaler_X.transform(X)
@@ -91,7 +91,7 @@ class ModelPipelineBase(ABC):
         if self.model is None:
             raise ValueError("Model has not been trained yet")
 
-        predictions = self.model.predict(X)
+        predictions = self.model.predict(X, verbose=verbose)
         if self.normalize and self.scaler_y is not None:
             predictions = self.scaler_y.inverse_transform(predictions)
 
