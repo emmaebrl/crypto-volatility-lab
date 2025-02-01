@@ -78,7 +78,7 @@ def create_time_series_html(request: Request, window_size: int = 21):
     if not scraped_cached_data:
         raise HTTPException(
             status_code=400,
-            detail="Aucune donnée disponible. Exécutez `/scrape` d'abord.",
+            detail="Aucune donnée disponible. Exécutez /scrape d'abord.",
         )
 
     time_series_data = {}
@@ -111,7 +111,7 @@ def compute_features_html(request: Request):
     if not time_series_cached_data:
         raise HTTPException(
             status_code=400,
-            detail="Aucune donnée disponible. Exécutez `/scrape` d'abord.",
+            detail="Aucune donnée disponible. Exécutez /scrape d'abord.",
         )
 
     features_data = {}
@@ -206,20 +206,17 @@ def predictions_by_model(model_type: str, request: Request):
 
 @app.get("/risk_parity", response_class=HTMLResponse)
 def risk_parity_page(request: Request):
-    """
-    Génère la page HTML affichant les poids optimisés du portefeuille en utilisant uniquement la méthode Risk Parity simple.
-    Affiche les poids pour chaque jour de t+1 à t+5.
-    """
+    
 
     global predictions_cached_data
 
     if not predictions_cached_data:
         raise HTTPException(
             status_code=400,
-            detail="Aucune prédiction disponible. Exécutez `/predictions/LSTM` d'abord.",
+            detail="Aucune prédiction disponible. Exécutez /predictions/LSTM d'abord.",
         )
 
-    # Dictionnaire pour stocker les poids pour chaque jour t+1 à t+5
+    
     all_days_weights = {}
 
     for day_offset in range(1, 6):  # Pour t+1 à t+5
@@ -230,21 +227,21 @@ def risk_parity_page(request: Request):
         }
 
         if not day_predictions:
-            continue  # Passer si aucune prédiction pour ce jour
+            continue  
 
-        # Créer un DataFrame des volatilites pour le jour en question
+        
         volatility_df = pd.DataFrame([day_predictions])
         print(f"\n✅ Volatility DataFrame (t+{day_offset}):\n", volatility_df)
 
-        # Créer une instance de PortfolioConstructor pour le jour en question
+        
         portfolio_constructor = PortfolioConstructor(
             volatility_time_series=volatility_df
         )
 
-        # Calculer les poids avec la méthode simple
+        
         weights_df = portfolio_constructor.risk_parity_weights_simple()
 
-        # Conversion des résultats en dictionnaire
+        
         all_days_weights[f"t+{day_offset}"] = weights_df.to_dict(orient="records")[0]
 
     if not all_days_weights:
@@ -255,17 +252,17 @@ def risk_parity_page(request: Request):
 
     print("\n✅ Poids optimisés pour t+1 à t+5:", all_days_weights)
 
-    # Envoi des résultats au template
+    
     return templates.TemplateResponse(
         "risk_parity.html",
         {
             "request": request,
-            "data": all_days_weights,  # Contient les poids pour chaque jour t+1 à t+5
+            "data": all_days_weights,  
         },
     )
 
 
-if __name__ == "__main__":
+if _name_ == "_main_":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
