@@ -107,7 +107,7 @@ class ModelPipelineBase(ABC):
         if self.model is None:
             raise ValueError("Model has not been trained yet")
 
-        predictions = self.model.predict(X, verbose=0)
+        predictions = self.model.predict(X)
 
         if self.normalize and self.scaler_y is not None:
             predictions = self.scaler_y.inverse_transform(predictions)
