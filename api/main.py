@@ -22,7 +22,7 @@ from crypto_volatility_lab.portfolio_optimization.portfolioConstructor import (
     PortfolioConstructor,
 )
 
-os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+# os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 
 app = FastAPI(title="Crypto Volatility Lab API")
@@ -175,7 +175,7 @@ def predictions_by_model(model_type: str, request: Request):
         last_date = df["Date"].max()
 
         # take last date and 30 days before
-        df = df[df["Date"] >= last_date - pd.DateOffset(days=29)]
+        # df = df[df["Date"] >= last_date - pd.DateOffset(days=32)]
         df = df[features_names]
 
         model_path = os.path.join("api", "models", crypto, f"{crypto}_{model_type}.pkl")
@@ -185,9 +185,7 @@ def predictions_by_model(model_type: str, request: Request):
                 status_code=404,
                 detail=f"Modèle {model_type} introuvable pour {crypto}.",
             )
-
         predictions = predict_for_model(model_path, df)
-        print(f"\n✅ Predictions for {crypto} using {model_type}:", predictions)
 
         predictions = predictions.flatten()
         predict_data[crypto] = [
@@ -245,7 +243,9 @@ def risk_parity_page(request: Request):
         print(f"\n✅ Volatility DataFrame (t+{day_offset}):\n", volatility_df)
 
         # Créer une instance de PortfolioConstructor pour le jour en question
-        portfolio_constructor = PortfolioConstructor(volatility_time_series=volatility_df)
+        portfolio_constructor = PortfolioConstructor(
+            volatility_time_series=volatility_df
+        )
 
         # Calculer les poids avec la méthode simple
         weights_df = portfolio_constructor.risk_parity_weights_simple()
@@ -266,10 +266,9 @@ def risk_parity_page(request: Request):
         "risk_parity.html",
         {
             "request": request,
-            "data": all_days_weights  # Contient les poids pour chaque jour t+1 à t+5
+            "data": all_days_weights,  # Contient les poids pour chaque jour t+1 à t+5
         },
     )
-
 
 
 if __name__ == "__main__":

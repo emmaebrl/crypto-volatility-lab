@@ -81,7 +81,7 @@ class ModelPipelineBase(ABC):
             verbose=verbose,
         )
 
-    def predict(self, X: np.ndarray, verbose: int = 0) -> np.ndarray:
+    def predict(self, X: np.ndarray) -> np.ndarray:
         """Generate predictions."""
         if self.normalize and self.scaler_X is not None:
             X = self.scaler_X.transform(X)
@@ -91,7 +91,7 @@ class ModelPipelineBase(ABC):
         if self.model is None:
             raise ValueError("Model has not been trained yet")
 
-        predictions = self.model.predict(X, verbose=verbose)
+        predictions = self.model.predict(X)
         if self.normalize and self.scaler_y is not None:
             predictions = self.scaler_y.inverse_transform(predictions)
 
