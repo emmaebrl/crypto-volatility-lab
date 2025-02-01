@@ -1,28 +1,22 @@
 import os
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse, Response
-from fastapi.templating import Jinja2Templates
-import numpy as np
-from starlette.requests import Request
 import pandas as pd
 import matplotlib
 import pickle
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import io
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+from starlette.requests import Request
+
 from crypto_volatility_lab.data_construction.cryptoScraper import CryptoScraper
 from crypto_volatility_lab.data_construction.featuresCreator import FeaturesCreator
 from crypto_volatility_lab.data_construction.timeSeriesCreator import TimeSeriesCreator
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.templating import Jinja2Templates
-import pandas as pd
-from typing import Any, Dict, List, Optional
 from crypto_volatility_lab.portfolio_optimization.portfolioConstructor import (
     PortfolioConstructor,
 )
 
-# os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+matplotlib.use("Agg")
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 
 app = FastAPI(title="Crypto Volatility Lab API")
