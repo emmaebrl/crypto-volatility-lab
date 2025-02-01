@@ -213,10 +213,10 @@ def predictions_by_model(model_type: str, request: Request):
 
 
 @app.get("/risk_parity", response_class=HTMLResponse)
-def risk_parity_page(request: Request, target_vol_factor: Optional[float] = 1.0):
+def risk_parity_page(request: Request):
     """
-    Génère la page HTML affichant les poids optimisés du portefeuille en utilisant Risk Parity.
-    Affiche les deux méthodes : "simple" et "target".
+    Génère la page HTML affichant les poids optimisés du portefeuille en utilisant uniquement la méthode Risk Parity simple.
+    Affiche les poids pour chaque jour de t+1 à t+5.
     """
 
     global predictions_cached_data
@@ -227,60 +227,49 @@ def risk_parity_page(request: Request, target_vol_factor: Optional[float] = 1.0)
             detail="Aucune prédiction disponible. Exécutez `/predictions/LSTM` d'abord.",
         )
 
-    # 🔹 Sélectionner les valeurs `t+5` de la **deuxième ligne** (index 1)
-    lstm_predictions = {
-        crypto: data[1]["t+5"] if len(data) > 1 and "t+5" in data[1] else None
-        for crypto, data in predictions_cached_data.items()
-    }
+    # Dictionnaire pour stocker les poids pour chaque jour t+1 à t+5
+    all_days_weights = {}
 
-    # 🔹 Supprimer les cryptos sans valeur valide
-    lstm_predictions = {k: v for k, v in lstm_predictions.items() if v is not None}
+    for day_offset in range(1, 6):  # Pour t+1 à t+5
+        day_predictions = {
+            crypto: data[day_offset]["Volatility"]
+            for crypto, data in predictions_cached_data.items()
+            if len(data) > day_offset
+        }
 
-    if not lstm_predictions:
+        if not day_predictions:
+            continue  # Passer si aucune prédiction pour ce jour
+
+        # Créer un DataFrame des volatilites pour le jour en question
+        volatility_df = pd.DataFrame([day_predictions])
+        print(f"\n✅ Volatility DataFrame (t+{day_offset}):\n", volatility_df)
+
+        # Créer une instance de PortfolioConstructor pour le jour en question
+        portfolio_constructor = PortfolioConstructor(volatility_time_series=volatility_df)
+
+        # Calculer les poids avec la méthode simple
+        weights_df = portfolio_constructor.risk_parity_weights_simple()
+
+        # Conversion des résultats en dictionnaire
+        all_days_weights[f"t+{day_offset}"] = weights_df.to_dict(orient="records")[0]
+
+    if not all_days_weights:
         raise HTTPException(
             status_code=400,
-            detail="Les prédictions `t+5` (ligne 2) ne sont pas disponibles.",
+            detail="Aucune prédiction valide pour les jours t+1 à t+5.",
         )
 
-    # 🔹 Création du DataFrame pour le calcul Risk Parity
-    volatility_df = pd.DataFrame([lstm_predictions])
-    print("\n✅ Volatility DataFrame (t+5, ligne 2) :\n", volatility_df)
+    print("\n✅ Poids optimisés pour t+1 à t+5:", all_days_weights)
 
-    # 🔹 Création de l'instance PortfolioConstructor
-    portfolio_constructor = PortfolioConstructor(
-        volatility_time_series=volatility_df, target_vol_factor=target_vol_factor
-    )
-
-    # 🔹 Calcul des deux méthodes
-    optimized_weights = {
-        "simple": portfolio_constructor.risk_parity_weights_simple(),
-        "target": portfolio_constructor.risk_parity_weights_simple_target(),
-    }
-
-    # 🔹 Vérification et conversion des résultats
-    latest_weights = {}
-    for method, df in optimized_weights.items():
-        if isinstance(df, pd.DataFrame):
-            latest_weights[method] = df.to_dict(orient="records")
-        elif isinstance(df, pd.Series):
-            latest_weights[method] = df.to_dict()
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Erreur: `optimized_weights` pour {method} est un float au lieu d'un DataFrame.",
-            )
-
-    print("\n✅ Debug: latest_weights après conversion:", latest_weights)
-
-    # 🔹 Envoi des résultats au template
+    # Envoi des résultats au template
     return templates.TemplateResponse(
         "risk_parity.html",
         {
             "request": request,
-            "target_vol_factor": target_vol_factor,
-            "data": latest_weights,  # ✅ Contient les poids pour "simple" et "target"
+            "data": all_days_weights  # Contient les poids pour chaque jour t+1 à t+5
         },
     )
+
 
 
 if __name__ == "__main__":

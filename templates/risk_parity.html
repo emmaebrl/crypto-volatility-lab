@@ -51,26 +51,22 @@
     <p><strong>Target Volatility Factor:</strong> {{ target_vol_factor }}</p>
     {% endif %}
 
-    {% for method, records in data.items() %}
+    {% for day, methods in data.items() %}
     <div class="result-box">
-        <h3>🔹 Optimized Portfolio Weights ({{ method.capitalize() }} Method)</h3>
+        <h3>🔹 Portfolio Weights for {{ day.upper() }}</h3>
         <table class="table table-bordered">
             <thead>
                 <tr>
-                    <th>Date</th>
                     <th>Crypto</th>
                     <th>Weight</th>
                 </tr>
             </thead>
             <tbody>
-                {% for row in records %}
-                    {% for crypto, weight in row.items() %}
-                    <tr>
-                        <td>{{ loop.index }}</td>  <!-- 🔹 Affiche l'index de la ligne -->
-                        <td>{{ crypto }}</td>
-                        <td>{{ weight | round(4) }}</td>
-                    </tr>
-                    {% endfor %}
+                {% for crypto, weight in methods.items() %}
+                <tr>
+                    <td>{{ crypto }}</td>
+                    <td>{{ weight | round(4) }}</td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>
