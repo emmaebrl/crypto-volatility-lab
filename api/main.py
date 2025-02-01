@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
@@ -16,8 +17,12 @@ from crypto_volatility_lab.data_construction.timeSeriesCreator import TimeSeries
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 import pandas as pd
-from typing import Dict, List, Optional
-from crypto_volatility_lab.portfolio_optimization.portfolioConstructor import  PortfolioConstructor
+from typing import Any, Dict, List, Optional
+from crypto_volatility_lab.portfolio_optimization.portfolioConstructor import (
+    PortfolioConstructor,
+)
+
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
 
 app = FastAPI(title="Crypto Volatility Lab API")
@@ -155,31 +160,49 @@ def predictions_page(request: Request):
 
 @app.get("/predictions/{model_type}", response_class=HTMLResponse)
 def predictions_by_model(model_type: str, request: Request):
-    """Generate predictions for all cryptos using the selected model type."""
+    """Generate future predictions for all cryptos using the selected model type."""
     global predictions_cached_data
-
     if not features_cached_data:
         raise HTTPException(
             status_code=400,
-            detail="Aucune donnée disponible. Exécutez `/compute_features` d'abord.",
+            detail="Aucune donnée disponible. Exécutez /compute_features d'abord.",
         )
 
     predict_data = {}
     for crypto, data in features_cached_data.items():
         df = pd.DataFrame(data)
-        df = df[df["Date"] < "2024-01-01"]
-        df["Date"] = str(df["Date"])
+        df["Date"] = pd.to_datetime(df["Date"])
+        last_date = df["Date"].max()
+
+        # take last date and 30 days before
+        df = df[df["Date"] >= last_date - pd.DateOffset(days=29)]
         df = df[features_names]
 
-        model_path = f"api/models/{crypto}/{crypto}_{model_type}.pkl"
+        model_path = os.path.join("api", "models", crypto, f"{crypto}_{model_type}.pkl")
+
+        if not os.path.exists(model_path):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Modèle {model_type} introuvable pour {crypto}.",
+            )
+
         predictions = predict_for_model(model_path, df)
-        if predictions.ndim == 1:
-            predictions = np.expand_dims(predictions, axis=-1)
-        prediction_df = pd.DataFrame(
-            predictions, columns=[f"t+{i+1}" for i in range(predictions.shape[1])]
-        )
-        prediction_df["Date"] = pd.DataFrame(data)["Date"][-len(predictions) :]
-        predict_data[crypto] = prediction_df.to_dict(orient="records")
+        print(f"\n✅ Predictions for {crypto} using {model_type}:", predictions)
+
+        predictions = predictions.flatten()
+        predict_data[crypto] = [
+            {"Date": last_date, "Volatility": df["Volatility"].values[-1]}
+        ]
+
+        for i in range(5):
+            predict_data[crypto].append(
+                {
+                    "Date": last_date + pd.DateOffset(days=i + 1),
+                    "Volatility": predictions[i],
+                }
+            )
+
+        print(predict_data[crypto])
 
     predictions_cached_data = predict_data
 
@@ -187,7 +210,6 @@ def predictions_by_model(model_type: str, request: Request):
         "crypto_predictions.html",
         {"request": request, "model_type": model_type, "data": predict_data},
     )
-
 
 
 @app.get("/risk_parity", response_class=HTMLResponse)
@@ -200,7 +222,10 @@ def risk_parity_page(request: Request, target_vol_factor: Optional[float] = 1.0)
     global predictions_cached_data
 
     if not predictions_cached_data:
-        raise HTTPException(status_code=400, detail="Aucune prédiction disponible. Exécutez `/predictions/LSTM` d'abord.")
+        raise HTTPException(
+            status_code=400,
+            detail="Aucune prédiction disponible. Exécutez `/predictions/LSTM` d'abord.",
+        )
 
     # 🔹 Sélectionner les valeurs `t+5` de la **deuxième ligne** (index 1)
     lstm_predictions = {
@@ -212,7 +237,10 @@ def risk_parity_page(request: Request, target_vol_factor: Optional[float] = 1.0)
     lstm_predictions = {k: v for k, v in lstm_predictions.items() if v is not None}
 
     if not lstm_predictions:
-        raise HTTPException(status_code=400, detail="Les prédictions `t+5` (ligne 2) ne sont pas disponibles.")
+        raise HTTPException(
+            status_code=400,
+            detail="Les prédictions `t+5` (ligne 2) ne sont pas disponibles.",
+        )
 
     # 🔹 Création du DataFrame pour le calcul Risk Parity
     volatility_df = pd.DataFrame([lstm_predictions])
@@ -220,14 +248,13 @@ def risk_parity_page(request: Request, target_vol_factor: Optional[float] = 1.0)
 
     # 🔹 Création de l'instance PortfolioConstructor
     portfolio_constructor = PortfolioConstructor(
-        volatility_time_series=volatility_df,
-        target_vol_factor=target_vol_factor
+        volatility_time_series=volatility_df, target_vol_factor=target_vol_factor
     )
 
     # 🔹 Calcul des deux méthodes
     optimized_weights = {
         "simple": portfolio_constructor.risk_parity_weights_simple(),
-        "target": portfolio_constructor.risk_parity_weights_simple_target()
+        "target": portfolio_constructor.risk_parity_weights_simple_target(),
     }
 
     # 🔹 Vérification et conversion des résultats
@@ -238,7 +265,10 @@ def risk_parity_page(request: Request, target_vol_factor: Optional[float] = 1.0)
         elif isinstance(df, pd.Series):
             latest_weights[method] = df.to_dict()
         else:
-            raise HTTPException(status_code=500, detail=f"Erreur: `optimized_weights` pour {method} est un float au lieu d'un DataFrame.")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erreur: `optimized_weights` pour {method} est un float au lieu d'un DataFrame.",
+            )
 
     print("\n✅ Debug: latest_weights après conversion:", latest_weights)
 
@@ -248,9 +278,10 @@ def risk_parity_page(request: Request, target_vol_factor: Optional[float] = 1.0)
         {
             "request": request,
             "target_vol_factor": target_vol_factor,
-            "data": latest_weights  # ✅ Contient les poids pour "simple" et "target"
-        }
+            "data": latest_weights,  # ✅ Contient les poids pour "simple" et "target"
+        },
     )
+
 
 if __name__ == "__main__":
     import uvicorn
