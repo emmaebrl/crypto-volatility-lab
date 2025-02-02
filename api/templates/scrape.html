@@ -22,7 +22,7 @@
             background: rgba(255, 255, 255, 0.15);
             backdrop-filter: blur(12px);
             box-shadow: 0px 10px 20px rgba(0, 0, 0, 0.3);
-            display: none; /* Cache les tables par défaut */
+            display: none; 
         }
         .crypto-title {
             color: #f4c20d;
@@ -92,7 +92,7 @@
                     </tbody>
                 </table>
                 {% else %}
-                <p class="text-warning">⚠️ Aucune donnée disponible pour {{ crypto_name }}</p>
+                <p class="text-warning">⚠️ No data available for {{ crypto_name }}</p>
                 {% endif %}
             </div>
         </div>
