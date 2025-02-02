@@ -20,10 +20,8 @@ class PortfolioConstructor:
         return weights
 
     def vol_target_weights(self, target_volatility: float = 0.15) -> pd.DataFrame:
-        print(self.volatility_time_series.describe())
 
         weights = target_volatility / self.volatility_time_series
-        print(weights)
 
         # weights = weights.clip(lower=0.1, upper=w_max)
         weights = weights.div(weights.sum(axis=1), axis=0)

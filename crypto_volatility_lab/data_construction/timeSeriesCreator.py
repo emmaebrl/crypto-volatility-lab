@@ -35,13 +35,13 @@ class TimeSeriesCreator:
         )
         return pd.Series(log_returns)
 
-    def create_volatility_time_series(self, window_size: int = 21):
+    def create_volatility_time_series(self, window_size: int = 30):
         """Creates a time series of rolling volatility from the log return values."""
         log_returns = self.create_log_return_time_series()
         volatility = log_returns.rolling(window=window_size).std()
         return volatility
 
-    def create_time_series(self, window_size: int = 21):
+    def create_time_series(self, window_size: int = 30):
         """Creates a time series of log returns and volatility for training a neural network."""
         log_returns = self.create_log_return_time_series()
         volatility = self.create_volatility_time_series(window_size)
