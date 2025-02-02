@@ -1,10 +1,8 @@
-import os
 from typing import Tuple, Optional
 import numpy as np
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from sklearn.preprocessing import MinMaxScaler
 from abc import ABC, abstractmethod
-from tensorflow.keras.models import load_model  # type: ignore
 import pickle
 
 

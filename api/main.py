@@ -200,8 +200,6 @@ def predictions_by_model(model_type: str, request: Request):
                     }
                 )
 
-            print(predict_data[crypto])
-
         predictions_cached_data = predict_data
 
         return templates.TemplateResponse(
@@ -236,7 +234,6 @@ def risk_parity_page(request: Request):
                 continue
 
             volatility_df = pd.DataFrame([day_predictions])
-            print(f"\n✅ Volatility DataFrame (t+{day_offset}):\n", volatility_df)
 
             portfolio_constructor = PortfolioConstructor(
                 volatility_time_series=volatility_df
@@ -254,7 +251,6 @@ def risk_parity_page(request: Request):
                 detail="No data available for risk parity optimization.",
             )
 
-        print("\n✅ All Days Weights:\n", all_days_weights)
         return templates.TemplateResponse(
             "risk_parity.html",
             {
