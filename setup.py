@@ -6,6 +6,6 @@ setup(
     packages=["crypto_volatility_lab"],
     install_requires=[],
     description="Tools to analyze and model cryptocurrency volatility. Predict future volatility and construct optimal portfolios.",
-    author="Lina Benzemma, Sharon Chemmamma, Emma Eberle",
+    author="Lina Benzemma, Sharon Chemmama, Emma Eberle",
     url="https://github.com/emmaebrl/crypto-volatility-lab",
 )
