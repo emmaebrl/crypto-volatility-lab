@@ -1,4 +1,4 @@
-# 🌟 Cryptocurrency Volatility Prediction and Portfolio Strategy 📈
+# 🌟 Neural Network-Based Volatility Forecasting for Optimized Cryptocurrency Index Portfolios 📈
 
 Welcome to our project **"crypto-volatility-lab"**, based on the paper *"Volatility Forecasting with Neural Networks for Portfolio Optimization of Cryptocurrencies Indexes"* which can be found in this repository.
 
