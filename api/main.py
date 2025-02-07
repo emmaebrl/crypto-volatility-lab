@@ -3,9 +3,10 @@ import pandas as pd
 import matplotlib
 import pickle
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from starlette.requests import Request
 
 from crypto_volatility_lab.data_construction.cryptoScraper import CryptoScraper
@@ -28,10 +29,22 @@ def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.get("/health")
-def health_check():
-    """Health check endpoint."""
-    return {"status": "ok"}
+class HealthCheck(BaseModel):
+    """Response model to validate and return when performing a health check."""
+
+    status: str = "OK"
+
+
+@app.get(
+    "/health",
+    tags=["healthcheck"],
+    summary="Perform a Health Check",
+    response_description="Return HTTP Status Code 200 (OK)",
+    status_code=status.HTTP_200_OK,
+    response_model=HealthCheck,
+)
+def get_health() -> HealthCheck:
+    return HealthCheck(status="OK")
 
 
 @app.get("/scrape", response_class=HTMLResponse)
