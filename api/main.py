@@ -1,4 +1,5 @@
 import os
+import socket
 import pandas as pd
 import matplotlib
 import pickle
@@ -6,6 +7,7 @@ import pickle
 from fastapi import FastAPI, HTTPException, status
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+import psutil
 from pydantic import BaseModel
 from starlette.requests import Request
 
@@ -29,22 +31,24 @@ def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-class HealthCheck(BaseModel):
-    """Response model to validate and return when performing a health check."""
+class HealthCheckResponse(BaseModel):
+    status: str
+    cpu_usage: float
+    memory_usage: float
+    disk_usage: float
+    hostname: str
 
-    status: str = "OK"
 
-
-@app.get(
-    "/health",
-    tags=["healthcheck"],
-    summary="Perform a Health Check",
-    response_description="Return HTTP Status Code 200 (OK)",
-    status_code=status.HTTP_200_OK,
-    response_model=HealthCheck,
-)
-def get_health() -> HealthCheck:
-    return HealthCheck(status="OK")
+@app.get("/health", response_model=HealthCheckResponse)
+def health_check():
+    """Health check endpoint to monitor API availability and system status"""
+    return {
+        "status": "healthy",
+        "cpu_usage": psutil.cpu_percent(),
+        "memory_usage": psutil.virtual_memory().percent,
+        "disk_usage": psutil.disk_usage("/").percent,
+        "hostname": socket.gethostname(),
+    }
 
 
 @app.get("/scrape", response_class=HTMLResponse)
