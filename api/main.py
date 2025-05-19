@@ -65,10 +65,13 @@ def scrape_crypto_html(request: Request):
             if data is None or data.empty:
                 scraped_data[crypto] = []
             else:
-                data["Date"] = pd.to_datetime(data["Date"])
-                data = data.sort_values(by="Date", ascending=False).reset_index(
-                    drop=True
-                )
+                data["Date"] = pd.to_datetime(data["Date"], format="mixed", errors="coerce")
+                data = data.dropna(subset=["Date"])
+
+                data = data.dropna(subset=["Date"])  # 🔥 supprime les lignes avec Date invalide
+
+                data = data.sort_values(by="Date", ascending=False).reset_index(drop=True)
+
 
                 numeric_columns = ["Open", "High", "Low", "Close", "Adj", "Volume"]
                 for col in numeric_columns:
@@ -188,7 +191,11 @@ def predictions_by_model(model_type: str, request: Request):
         predict_data = {}
         for crypto, data in features_cached_data.items():
             df = pd.DataFrame(data)
-            df["Date"] = pd.to_datetime(df["Date"])
+            df["Date"] = pd.to_datetime(df["Date"], format="mixed", errors="coerce")
+            df = df.dropna(subset=["Date"])
+
+            df = df.dropna(subset=["Date"])
+
             last_date = df["Date"].max()
 
             df = df[features_names]

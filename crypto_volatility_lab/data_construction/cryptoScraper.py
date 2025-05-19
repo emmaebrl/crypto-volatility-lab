@@ -69,7 +69,9 @@ class CryptoScraper:
                 data.append([td.text for td in row.find_all("td")])
             data = pd.DataFrame(data, columns=data_headers)
             if "Date" in data.columns:
-                data["Date"] = pd.to_datetime(data["Date"])
+                data["Date"] = pd.to_datetime(data["Date"], format="mixed", errors="coerce")
+                data = data.dropna(subset=["Date"])
+
             
             for col in ["Open", "High", "Low", "Close", "Adj", "Volume"]:
                 if col in data.columns:
